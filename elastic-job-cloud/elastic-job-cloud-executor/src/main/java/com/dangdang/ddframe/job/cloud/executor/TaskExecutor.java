@@ -55,12 +55,16 @@ public final class TaskExecutor implements Executor {
     
     private volatile JobEventBus jobEventBus = new JobEventBus();
     
+    private volatile HealthChecker healthChecker;
+    
     public TaskExecutor() {
         executorService = new ExecutorServiceObject("cloud-task-executor", Runtime.getRuntime().availableProcessors() * 100).createExecutorService();
     }
     
     @Override
     public void registered(final ExecutorDriver executorDriver, final Protos.ExecutorInfo executorInfo, final Protos.FrameworkInfo frameworkInfo, final Protos.SlaveInfo slaveInfo) {
+        int timeout = 0;
+        int maxTimeouts = 0;
         if (!executorInfo.getData().isEmpty()) {
             Map<String, String> data = SerializationUtils.deserialize(executorInfo.getData().toByteArray());
             BasicDataSource dataSource = new BasicDataSource();
@@ -69,7 +73,14 @@ public final class TaskExecutor implements Executor {
             dataSource.setPassword(data.get("event_trace_rdb_password"));
             dataSource.setUsername(data.get("event_trace_rdb_username"));
             jobEventBus = new JobEventBus(new JobEventRdbConfiguration(dataSource));
+            if (data.containsKey("framework_ping_timeout")) {
+                timeout = Integer.valueOf(data.get("framework_ping_timeout"));
+            }
+            if (data.containsKey("framework_ping_max_timeouts")) {
+                maxTimeouts = Integer.valueOf(data.get("framework_ping_max_timeouts"));
+            }
         }
+        healthChecker = new HealthChecker(executorDriver, timeout, maxTimeouts);
     }
     
     @Override
@@ -96,6 +107,8 @@ public final class TaskExecutor implements Executor {
         if (null != bytes && "STOP".equals(new String(bytes))) {
             log.error("call frameworkMessage executor stopped.");
             executorDriver.stop();
+        } else {
+            healthChecker.receive(bytes);
         }
     }
     

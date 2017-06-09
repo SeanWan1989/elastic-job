@@ -41,6 +41,7 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.plugins.management.ShutdownHookPlugin;
 
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -137,6 +138,10 @@ public final class DaemonTaskScheduler {
                 throw new JobSystemException(ex);
             }
         }
+    }
+    
+    static Set<String> getAllRunningTaskIDs() {
+        return RUNNING_SCHEDULERS.keySet();
     }
     
     /**

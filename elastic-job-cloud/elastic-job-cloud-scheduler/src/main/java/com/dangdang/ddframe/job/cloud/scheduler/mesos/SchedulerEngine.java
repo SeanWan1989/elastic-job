@@ -25,7 +25,6 @@ import com.dangdang.ddframe.job.event.type.JobStatusTraceEvent;
 import com.dangdang.ddframe.job.event.type.JobStatusTraceEvent.Source;
 import com.dangdang.ddframe.job.event.type.JobStatusTraceEvent.State;
 import com.netflix.fenzo.TaskScheduler;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;
@@ -38,7 +37,6 @@ import java.util.List;
  *
  * @author zhangliang
  */
-@RequiredArgsConstructor
 @Slf4j
 public final class SchedulerEngine implements Scheduler {
     
@@ -51,6 +49,18 @@ public final class SchedulerEngine implements Scheduler {
     private final FrameworkIDService frameworkIDService;
     
     private final StatisticManager statisticManager;
+    
+    private final TaskHealthChecker taskHealthChecker;
+    
+    public SchedulerEngine(final TaskScheduler taskScheduler, final FacadeService facadeService, final JobEventBus jobEventBus,
+            final FrameworkIDService frameworkIDService, final StatisticManager statisticManager) {
+        this.taskScheduler = taskScheduler;
+        this.facadeService = facadeService;
+        this.jobEventBus = jobEventBus;
+        this.frameworkIDService = frameworkIDService;
+        this.statisticManager = statisticManager;
+        this.taskHealthChecker = new TaskHealthChecker(facadeService);
+    }
     
     @Override
     public void registered(final SchedulerDriver schedulerDriver, final Protos.FrameworkID frameworkID, final Protos.MasterInfo masterInfo) {
@@ -136,6 +146,7 @@ public final class SchedulerEngine implements Scheduler {
     @Override
     public void frameworkMessage(final SchedulerDriver schedulerDriver, final Protos.ExecutorID executorID, final Protos.SlaveID slaveID, final byte[] bytes) {
         log.trace("call frameworkMessage slaveID: {}, bytes: {}", slaveID, new String(bytes));
+        taskHealthChecker.process(schedulerDriver, executorID, slaveID, bytes);
     }
     
     @Override
