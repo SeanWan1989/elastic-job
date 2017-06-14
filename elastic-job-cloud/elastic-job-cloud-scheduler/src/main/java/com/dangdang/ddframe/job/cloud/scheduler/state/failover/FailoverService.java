@@ -177,7 +177,7 @@ public final class FailoverService {
      * @param jobName 作业名称
      * @return 待失效转移的任务集合
      */
-    private Collection<FailoverTaskInfo> getFailoverTasks(final String jobName) {
+    public Collection<FailoverTaskInfo> getFailoverTasks(final String jobName) {
         List<String> failOverTasks = regCenter.getChildrenKeys(FailoverNode.getFailoverJobNodePath(jobName));
         List<FailoverTaskInfo> result = new ArrayList<>(failOverTasks.size());
         for (String each : failOverTasks) {

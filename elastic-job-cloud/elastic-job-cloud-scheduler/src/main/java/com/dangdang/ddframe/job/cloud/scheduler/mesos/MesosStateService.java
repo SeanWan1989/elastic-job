@@ -22,31 +22,25 @@ import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.sun.jersey.api.client.Client;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Mesos状态服务.
  * 
  * @author gaohongtao
+ * @author liguangyun
  */
 @Slf4j
 public class MesosStateService {
-    
-    private static String stateUrl;
     
     private final FrameworkIDService frameworkIDService;
     
@@ -55,49 +49,35 @@ public class MesosStateService {
     }
     
     /**
-     * 注册Mesos的Master信息.
-     * 
-     * @param hostName Master的主机名
-     * @param port Master端口
-     */
-    public static synchronized void register(final String hostName, final int port) {
-        stateUrl = String.format("http://%s:%d/state", hostName, port);
-    }
-    
-    /**
-     * 注销Mesos的Master信息.
-     */
-    public static synchronized void deregister() {
-        stateUrl = null;
-    }
-    
-    /**
      * 获取沙箱信息.
      * 
      * @param appName 作业云配置App的名字
      * @return 沙箱信息
-     * @throws JSONException 解析JSON格式异常
      */
-    public JsonArray sandbox(final String appName) throws JSONException {
-        JSONObject state = fetch(stateUrl);
+    public JsonArray sandbox(final String appName) {
+        MesosEndpointService mesosEndpointService = MesosEndpointService.getInstance();
+        Optional<JsonObject> state = mesosEndpointService.state(JsonObject.class);
+        if (!state.isPresent()) {
+            return new JsonArray();
+        }
         JsonArray result = new JsonArray();
-        for (JSONObject each : findExecutors(state.getJSONArray("frameworks"), appName)) {
-            JSONArray slaves = state.getJSONArray("slaves");
+        for (JsonObject each : findExecutors(state.get().getAsJsonArray("frameworks"), appName)) {
+            JsonArray slaves = state.get().getAsJsonArray("slaves");
             String slaveHost = null;
-            for (int i = 0; i < slaves.length(); i++) {
-                JSONObject slave = slaves.getJSONObject(i);
-                if (each.getString("slave_id").equals(slave.getString("id"))) {
-                    slaveHost = slave.getString("pid").split("@")[1];
+            for (int i = 0; i < slaves.size(); i++) {
+                JsonObject slave = slaves.get(i).getAsJsonObject();
+                if (each.get("slave_id").getAsString().equals(slave.get("id").getAsString())) {
+                    slaveHost = slave.get("pid").getAsString().split("@")[1];
                 }
             }
             Preconditions.checkNotNull(slaveHost);
-            JSONObject slaveState = fetch(String.format("http://%s/state", slaveHost));
-            String workDir = slaveState.getJSONObject("flags").getString("work_dir");
-            Collection<JSONObject> executorsOnSlave = findExecutors(slaveState.getJSONArray("frameworks"), appName);
-            for (JSONObject executorOnSlave : executorsOnSlave) {
+            Optional<JsonObject> slaveState = mesosEndpointService.state(String.format("http://%s", slaveHost), JsonObject.class);
+            String workDir = slaveState.get().getAsJsonObject("flags").get("work_dir").getAsString();
+            Collection<JsonObject> executorsOnSlave = findExecutors(slaveState.get().getAsJsonArray("frameworks"), appName);
+            for (JsonObject executorOnSlave : executorsOnSlave) {
                 JsonObject r = new JsonObject();
-                r.addProperty("hostname", slaveState.getString("hostname"));
-                r.addProperty("path", executorOnSlave.getString("directory").replace(workDir, ""));
+                r.addProperty("hostname", slaveState.get().get("hostname").getAsString());
+                r.addProperty("path", executorOnSlave.get("directory").getAsString().replace(workDir, ""));
                 result.add(r);
             }
         }
@@ -105,21 +85,88 @@ public class MesosStateService {
     }
     
     /**
+     * 获取任务沙箱信息.
+     *
+     * @param appName 作业云配置App名称
+     * @param executorId 执行器主键
+     * @return 沙箱信息
+     */
+    public String getMesosSandbox(final String appName, final String executorId) {
+        Optional<JsonObject> stateOptional = MesosEndpointService.getInstance().state(JsonObject.class);
+        if (!stateOptional.isPresent()) {
+            return "";
+        }
+        JsonObject state = stateOptional.get();
+        StringBuilder taskSandbox = new StringBuilder();
+        taskSandbox.append(state.get("pid").getAsString().split("@")[1]).append("/#/agents/");
+        for (JsonObject each : findExecutors(state.getAsJsonArray("frameworks"), appName)) {
+            JsonArray slaves = state.getAsJsonArray("slaves");
+            String slaveHost = null;
+            for (int i = 0; i < slaves.size(); i++) {
+                JsonObject slave = slaves.get(i).getAsJsonObject();
+                if (each.get("slave_id").getAsString().equals(slave.get("id").getAsString())) {
+                    taskSandbox.append(slave.get("id").getAsString()).append("/browse?path=");
+                    slaveHost = slave.get("pid").getAsString().split("@")[1];
+                }
+            }
+            Preconditions.checkNotNull(slaveHost);
+            Optional<JsonObject> slaveStateOptional = MesosEndpointService.getInstance().state(String.format("http://%s", slaveHost), JsonObject.class);
+            if (!slaveStateOptional.isPresent()) {
+                continue;
+            }
+            JsonObject slaveState = slaveStateOptional.get();
+            Collection<JsonObject> executorsOnSlave = findExecutors(slaveState.getAsJsonArray("frameworks"), appName);
+            for (JsonObject executorOnSlave : executorsOnSlave) {
+                if (executorId.equals(executorOnSlave.get("id").getAsString())) {
+                    String directory = executorOnSlave.get("directory").getAsString();
+                    if (null != directory) {
+                        taskSandbox.append(directory);
+                        return taskSandbox.toString();
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 获取主机信息.
+     *
+     * @param slaveId slave主键
+     * @return hostName 主机
+     */
+    public String getTaskHostname(final String slaveId) {
+        Optional<JsonObject> stateOptional = MesosEndpointService.getInstance().state(JsonObject.class);
+        if (!stateOptional.isPresent()) {
+            return "";
+        }
+        JsonArray slaves = stateOptional.get().getAsJsonArray("slaves");
+        String slaveHost = null;
+        for (int i = 0; i < slaves.size(); i++) {
+            JsonObject slave = slaves.get(i).getAsJsonObject();
+            if (slaveId.equals(slave.get("id").getAsString())) {
+                slaveHost = slave.get("hostname").getAsString();
+            }
+        }
+        return slaveHost;
+    }
+
+    /**
      * 查找执行器信息.
      * 
      * @param appName 作业云配置App的名字
      * @return 执行器信息
-     * @throws JSONException 解析JSON格式异常
      */
-    public Collection<ExecutorStateInfo> executors(final String appName) throws JSONException {
-        return Collections2.transform(findExecutors(fetch(stateUrl).getJSONArray("frameworks"), appName), new Function<JSONObject, ExecutorStateInfo>() {
+    public Collection<ExecutorStateInfo> executors(final String appName) {
+        MesosEndpointService mesosEndpointService = MesosEndpointService.getInstance();
+        Optional<JsonObject> jsonObject = mesosEndpointService.state(JsonObject.class);
+        if (!jsonObject.isPresent()) {
+            Collections.emptyList();
+        }
+        return Collections2.transform(findExecutors(jsonObject.get().getAsJsonArray("frameworks"), appName), new Function<JsonObject, ExecutorStateInfo>() {
             @Override
-            public ExecutorStateInfo apply(final JSONObject input) {
-                try {
-                    return ExecutorStateInfo.builder().id(getExecutorId(input)).slaveId(input.getString("slave_id")).build();
-                } catch (final JSONException ex) {
-                    throw new RuntimeException(ex);
-                }
+            public ExecutorStateInfo apply(final JsonObject input) {
+                return ExecutorStateInfo.builder().id(getExecutorId(input)).slaveId(input.get("slave_id").getAsString()).build();
             }
         });
     }
@@ -128,19 +175,13 @@ public class MesosStateService {
      * 获取所有执行器.
      *
      * @return 执行器信息
-     * @throws JSONException 解析JSON格式异常
      */
-    public Collection<ExecutorStateInfo> executors() throws JSONException {
+    public Collection<ExecutorStateInfo> executors() {
         return executors(null);
     }
     
-    private JSONObject fetch(final String url) {
-        Preconditions.checkState(!Strings.isNullOrEmpty(url));
-        return Client.create().resource(url).get(JSONObject.class);
-    }
-    
-    private Collection<JSONObject> findExecutors(final JSONArray frameworks, final String appName) throws JSONException {
-        List<JSONObject> result = Lists.newArrayList();
+    private Collection<JsonObject> findExecutors(final JsonArray frameworks, final String appName) {
+        List<JsonObject> result = Lists.newArrayList();
         Optional<String> frameworkIDOptional = frameworkIDService.fetch();
         String frameworkID;
         if (frameworkIDOptional.isPresent()) {
@@ -148,14 +189,14 @@ public class MesosStateService {
         } else {
             return result;
         }
-        for (int i = 0; i < frameworks.length(); i++) {
-            JSONObject framework = frameworks.getJSONObject(i);
-            if (!framework.getString("id").equals(frameworkID)) {
+        for (int i = 0; i < frameworks.size(); i++) {
+            JsonObject framework = frameworks.get(i).getAsJsonObject();
+            if (!framework.get("id").getAsString().equals(frameworkID)) {
                 continue;
             }
-            JSONArray executors = framework.getJSONArray("executors");
-            for (int j = 0; j < executors.length(); j++) {
-                JSONObject executor = executors.getJSONObject(j);
+            JsonArray executors = framework.getAsJsonArray("executors");
+            for (int j = 0; j < executors.size(); j++) {
+                JsonObject executor = executors.get(j).getAsJsonObject();
                 if (null == appName || appName.equals(getExecutorId(executor).split("@-@")[0])) {
                     result.add(executor);
                 }
@@ -164,8 +205,8 @@ public class MesosStateService {
         return result;
     }
     
-    private String getExecutorId(final JSONObject executor) throws JSONException {
-        return executor.has("id") ? executor.getString("id") : executor.getString("executor_id");
+    private String getExecutorId(final JsonObject executor) {
+        return executor.has("id") ? executor.get("id").getAsString() : executor.get("executor_id").getAsString();
     }
     
     @Builder

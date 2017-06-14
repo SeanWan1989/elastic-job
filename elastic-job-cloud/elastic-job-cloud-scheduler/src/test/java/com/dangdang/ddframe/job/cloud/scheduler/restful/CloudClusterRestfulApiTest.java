@@ -17,15 +17,21 @@
 
 package com.dangdang.ddframe.job.cloud.scheduler.restful;
 
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.mockito.junit.MockitoJUnitRunner;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-        CloudJobRestfulApiTest.class,
-        CloudAppRestfulApiTest.class,
-        CloudOperationRestfulApiTest.class,
-        CloudClusterRestfulApiTest.class
-        })
-public final class AllRestfulTests {
+import static com.dangdang.ddframe.job.cloud.scheduler.restful.RestfulTestsUtil.sentRequest;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertThat;
+
+@RunWith(MockitoJUnitRunner.class)
+public final class CloudClusterRestfulApiTest extends AbstractCloudRestfulApiTest {
+    
+    @Test
+    public void assertFindAllNodes() throws Exception {
+        assertThat(sentRequest("http://127.0.0.1:19000/api/cluster/nodes", "GET"), is(200));
+        assertThat(sentRequest("http://127.0.0.1:19000/api/cluster/nodes?roleName=test1", "GET"), is(200));
+    }
+    
 }

@@ -70,4 +70,19 @@ public class MesosMasterServerMock {
                 + "\"resources\":{\"disk\":0.0,\"mem\":128.0,\"gpus\":0.0,\"cpus\":1.0},\"slave_id\":\"d8701508-41b7-471e-9b32-61cf824a660d-S0\"}]}],\"completed_frameworks\":[],"
                 + "\"orphan_tasks\":[],\"unregistered_frameworks\":[]}");
     }
+    
+    @GET
+    @Path("/slaves")
+    public JsonObject slaves() throws JSONException {
+        return (JsonObject) new JsonParser().parse("{\"slaves\":[{\"id\":\"b0635964-e8c3-42aa-a4f7-2384835ecb53-S3\",\"pid\":\"slave(1)@10.10.10.1:9051\",\"hostname\":\"10.10.10.1\","
+                + "\"registered_time\":1495861799.51545,\"resources\":{\"disk\":41541.0,\"mem\":6144.0,\"gpus\":0.0,\"cpus\":6.0,\"ports\":\"[31000-32000]\"},\"used_resources\":"
+                + "{\"disk\":0.0,\"mem\":170.0,\"gpus\":0.0,\"cpus\":1.014},\"offered_resources\":{\"disk\":41541.0,\"mem\":5974.0,\"gpus\":0.0,\"cpus\":4.986,\"ports\":\"[31000-32000]\"},"
+                + "\"reserved_resources\":{\"test1\":{\"disk\":0.0,\"mem\":6144.0,\"gpus\":0.0,\"cpus\":6.0}},\"unreserved_resources\":{\"disk\":41541.0,\"mem\":0.0,\"gpus\":0.0,\"cpus\":0.0,"
+                + "\"ports\":\"[31000-32000]\"},\"attributes\":{},\"active\":true,\"version\":\"1.1.0\",\"reserved_resources_full\":{\"test1\":[{\"name\":\"cpus\",\"type\":\"SCALAR\","
+                + "\"scalar\":{\"value\":6.0},\"role\":\"test1\"},{\"name\":\"mem\",\"type\":\"SCALAR\",\"scalar\":{\"value\":6144.0},\"role\":\"test1\"}]},\"used_resources_full\":"
+                + "[{\"name\":\"cpus\",\"type\":\"SCALAR\",\"scalar\":{\"value\":1.014},\"role\":\"test1\"},{\"name\":\"mem\",\"type\":\"SCALAR\",\"scalar\":{\"value\":170.0},\"role\":\"test1\"}],"
+                + "\"offered_resources_full\":[{\"name\":\"cpus\",\"type\":\"SCALAR\",\"scalar\":{\"value\":4.986},\"role\":\"test1\"},{\"name\":\"mem\",\"type\":\"SCALAR\",\"scalar\":"
+                + "{\"value\":5974.0},\"role\":\"test1\"},{\"name\":\"disk\",\"type\":\"SCALAR\",\"scalar\":{\"value\":41541.0},\"role\":\"*\"},{\"name\":\"ports\",\"type\":\"RANGES\",\"ranges\""
+                + ":{\"range\":[{\"begin\":31000,\"end\":32000}]},\"role\":\"*\"}]}]}");
+    }
 }

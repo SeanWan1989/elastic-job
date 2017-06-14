@@ -22,4 +22,7 @@ $(function() {
     $("#exec-status").click(function() {
         $("#content-right").load("/html/history/job_exec_status.html");
     });
+    $("#nodes").click(function() {
+        $("#content-right").load("/html/cluster/cluster_overview.html");
+    });
 });

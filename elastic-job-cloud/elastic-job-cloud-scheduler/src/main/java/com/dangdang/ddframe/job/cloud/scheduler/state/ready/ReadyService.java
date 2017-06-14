@@ -29,6 +29,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -182,6 +183,24 @@ public final class ReadyService {
             if (!Strings.isNullOrEmpty(times)) {
                 result.put(each, Integer.parseInt(times));
             }
+        }
+        return result;
+    }
+
+    /**
+     * 获取待运行作业次数.
+     *
+     * @param jobName 作业名
+     * @return 待运行作业次数
+     */
+    public Collection<Map<String, String>> getReadyJobTimes(final String jobName) {
+        String times = regCenter.get(ReadyNode.getReadyJobNodePath(jobName));
+        Collection<Map<String, String>> result = Lists.newArrayList();
+        Map<String, String> readyMap = new HashMap<>();
+        if (!Strings.isNullOrEmpty(times)) {
+            readyMap.put("jobName", jobName);
+            readyMap.put("times", times);
+            result.add(readyMap);
         }
         return result;
     }

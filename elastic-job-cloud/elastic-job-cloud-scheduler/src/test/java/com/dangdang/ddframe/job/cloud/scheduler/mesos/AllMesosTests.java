@@ -34,7 +34,9 @@ import org.junit.runners.Suite;
         LaunchingTasksTest.class,
         FrameworkIDServiceTest.class,
         MesosStateServiceTest.class,
-        ReconcileServiceTest.class
+        ReconcileServiceTest.class,
+        MesosSlaveServiceTest.class,
+        MesosEndpointServiceTest.class
     })
 public final class AllMesosTests {
 }

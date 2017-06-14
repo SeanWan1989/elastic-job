@@ -20,6 +20,7 @@ package com.dangdang.ddframe.job.cloud.scheduler.state.running;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
 import com.dangdang.ddframe.job.cloud.scheduler.fixture.CloudJsonConstants;
 import com.dangdang.ddframe.job.cloud.scheduler.fixture.TaskNode;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosStateService;
 import com.dangdang.ddframe.job.context.ExecutionType;
 import com.dangdang.ddframe.job.context.TaskContext;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
@@ -29,6 +30,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.unitils.util.ReflectionUtils;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +41,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -76,15 +79,23 @@ public final class RunningServiceTest {
     }
     
     @Test
-    public void assertStart() {
+    public void assertStart() throws NoSuchFieldException {
         TaskNode taskNode1 = TaskNode.builder().jobName("test_job").shardingItem(0).slaveId("111").type(ExecutionType.READY).uuid(UUID.randomUUID().toString()).build();
         TaskNode taskNode2 = TaskNode.builder().jobName("test_job").shardingItem(1).slaveId("222").type(ExecutionType.FAILOVER).uuid(UUID.randomUUID().toString()).build();
+        TaskContext task1 = TaskContext.from(taskNode1.getTaskNodeValue());
+        TaskContext task2 = TaskContext.from(taskNode2.getTaskNodeValue());
         when(regCenter.getChildrenKeys(RunningNode.ROOT)).thenReturn(Collections.singletonList("test_job"));
         when(regCenter.getChildrenKeys(RunningNode.getRunningJobNodePath("test_job"))).thenReturn(Arrays.asList(taskNode1.getTaskNodePath(), taskNode2.getTaskNodePath()));
         when(regCenter.get(RunningNode.getRunningTaskNodePath(taskNode1.getTaskNodePath()))).thenReturn(taskNode1.getTaskNodeValue());
         when(regCenter.get(RunningNode.getRunningTaskNodePath(taskNode2.getTaskNodePath()))).thenReturn(taskNode2.getTaskNodeValue());
+        MesosStateService mesosStateService = mock(MesosStateService.class);
+        when(mesosStateService.getTaskHostname(task1.getSlaveId())).thenReturn("host1");
+        when(mesosStateService.getTaskHostname(task2.getSlaveId())).thenReturn("host2");
+        ReflectionUtils.setFieldValue(runningService, "mesosStateService", mesosStateService);
         runningService.start();
         assertThat(runningService.getAllRunningDaemonTasks().size(), is(2));
+        assertThat(runningService.getHostNameByTaskId(task1.getId()), is("host1"));
+        assertThat(runningService.getHostNameByTaskId(task2.getId()), is("host2"));
     }
     
     @Test

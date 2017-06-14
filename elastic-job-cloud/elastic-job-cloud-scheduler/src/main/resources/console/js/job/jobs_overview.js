@@ -88,18 +88,14 @@ function bindDetailJobButton() {
             url: "/api/job/jobs/" + jobName,
             contentType: "application/json",
             success: function(result) {
-                $(".box-body").remove();
-                $("#detail-job-body").load("html/job/detail_job.html", null, function() {
+                $("#index-job-name").text(jobName);
+                $("#content-right").load("html/job/detail_job.html", null, function() {
                     if("SCRIPT" === result.jobType) {
                         $("#bootstrap-script-div").show();
                     } else {
                         $("#bootstrap-script-div").hide();
                     }
                     renderJob(result);
-                    $("#data-detail-job").modal({backdrop : "static", keyboard : true});
-                    $("#close-button").on("click", function(){
-                        $("#data-detail-job").modal("hide");
-                    });
                 });
             }
         });
