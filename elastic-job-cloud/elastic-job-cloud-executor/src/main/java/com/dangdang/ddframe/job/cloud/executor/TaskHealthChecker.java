@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 
  * @author gaohongtao
  */
-class HealthChecker {
+class TaskHealthChecker {
     
     private final AtomicLong version = new AtomicLong(System.currentTimeMillis());
     
@@ -55,7 +55,7 @@ class HealthChecker {
     
     private final int maxTimeouts;
     
-    HealthChecker(final ExecutorDriver driver, final int timeout, final int maxTimeouts) {
+    TaskHealthChecker(final ExecutorDriver driver, final int timeout, final int maxTimeouts) {
         this.driver = driver;
         this.timeout = timeout < 1 ? 30 : timeout;
         this.maxTimeouts = maxTimeouts < 1 ? 5 : timeout;

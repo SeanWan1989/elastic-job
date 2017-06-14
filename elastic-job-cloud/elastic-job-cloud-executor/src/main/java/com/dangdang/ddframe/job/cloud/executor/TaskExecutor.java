@@ -55,7 +55,7 @@ public final class TaskExecutor implements Executor {
     
     private volatile JobEventBus jobEventBus = new JobEventBus();
     
-    private volatile HealthChecker healthChecker;
+    private volatile TaskHealthChecker taskHealthChecker;
     
     public TaskExecutor() {
         executorService = new ExecutorServiceObject("cloud-task-executor", Runtime.getRuntime().availableProcessors() * 100).createExecutorService();
@@ -73,14 +73,14 @@ public final class TaskExecutor implements Executor {
             dataSource.setPassword(data.get("event_trace_rdb_password"));
             dataSource.setUsername(data.get("event_trace_rdb_username"));
             jobEventBus = new JobEventBus(new JobEventRdbConfiguration(dataSource));
-            if (data.containsKey("framework_ping_timeout")) {
-                timeout = Integer.valueOf(data.get("framework_ping_timeout"));
+            if (data.containsKey("task_health_check_timeout_seconds")) {
+                timeout = Integer.valueOf(data.get("task_health_check_timeout_seconds"));
             }
-            if (data.containsKey("framework_ping_max_timeouts")) {
-                maxTimeouts = Integer.valueOf(data.get("framework_ping_max_timeouts"));
+            if (data.containsKey("task_health_check_max_timeouts")) {
+                maxTimeouts = Integer.valueOf(data.get("task_health_check_max_timeouts"));
             }
         }
-        healthChecker = new HealthChecker(executorDriver, timeout, maxTimeouts);
+        taskHealthChecker = new TaskHealthChecker(executorDriver, timeout, maxTimeouts);
     }
     
     @Override
@@ -108,7 +108,7 @@ public final class TaskExecutor implements Executor {
             log.error("call frameworkMessage executor stopped.");
             executorDriver.stop();
         } else {
-            healthChecker.receive(bytes);
+            taskHealthChecker.receive(bytes);
         }
     }
     

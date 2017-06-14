@@ -22,6 +22,7 @@ import com.dangdang.ddframe.job.reg.zookeeper.ZookeeperConfiguration;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ import org.apache.commons.dbcp.BasicDataSource;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -55,7 +57,7 @@ public final class BootstrapEnvironment {
         Properties result = new Properties();
         try (FileInputStream fileInputStream = new FileInputStream(PROPERTIES_PATH)) {
             result.load(fileInputStream);
-        } catch (final IOException ex) {
+        } catch (final IOException ignored) {
         }
         setPropertiesByEnv(result);
         return result;
@@ -173,6 +175,21 @@ public final class BootstrapEnvironment {
         return Optional.of(role);
     }
     
+    /**
+     * 获取任务检查周期信息.
+     * 
+     * @return 任务检查周期配置
+     */
+    public Map<String, String> getTaskHealthCheckConfig() {
+        int taskHealthCheckTimeoutSeconds = Integer.valueOf(getValue(EnvironmentArgument.TASK_HEALTH_CHECK_TIMEOUT_SECONDS));
+        int taskHealthCheckMaxTimeouts = Integer.valueOf(getValue(EnvironmentArgument.TASK_HEALTH_CHECK_MAX_TIMEOUTS));
+        if (taskHealthCheckTimeoutSeconds > 0 && taskHealthCheckMaxTimeouts > 0) {
+            return ImmutableMap.of(EnvironmentArgument.TASK_HEALTH_CHECK_TIMEOUT_SECONDS.getKey(), String.valueOf(taskHealthCheckTimeoutSeconds), EnvironmentArgument
+                    .TASK_HEALTH_CHECK_MAX_TIMEOUTS.getKey(), String.valueOf(taskHealthCheckMaxTimeouts));
+        }
+        return ImmutableMap.of();
+    }
+    
     private String getValue(final EnvironmentArgument environmentArgument) {
         String result = properties.getProperty(environmentArgument.getKey(), environmentArgument.getDefaultValue());
         if (environmentArgument.isRequired()) {
@@ -216,7 +233,11 @@ public final class BootstrapEnvironment {
 
         EVENT_TRACE_RDB_PASSWORD("event_trace_rdb_password", "", false),
     
-        RECONCILE_INTERVAL_MINUTES("reconcile_interval_minutes", "-1", false);
+        RECONCILE_INTERVAL_MINUTES("reconcile_interval_minutes", "-1", false),
+    
+        TASK_HEALTH_CHECK_TIMEOUT_SECONDS("task_health_check_timeout_seconds", "-1", false),
+        
+        TASK_HEALTH_CHECK_MAX_TIMEOUTS("task_health_check_max_timeouts", "-1", false);
         
         private final String key;
         

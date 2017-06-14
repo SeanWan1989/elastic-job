@@ -212,8 +212,15 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
                 .setValue(taskContext.getExecutorId(jobConfig.getAppName()))).setCommand(command)
                 .addResources(buildResource("cpus", appConfig.getCpuCount(), offer.getResourcesList()))
                 .addResources(buildResource("mem", appConfig.getMemoryMB(), offer.getResourcesList()));
+        //CHECKSTYLE:OFF
+        HashMap<String, String> executorData = new HashMap<>();
+        //CHECKSTYLE:ON
         if (env.getJobEventRdbConfiguration().isPresent()) {
-            executorBuilder.setData(ByteString.copyFrom(SerializationUtils.serialize(env.getJobEventRdbConfigurationMap()))).build();
+            executorData.putAll(env.getJobEventRdbConfigurationMap());
+        }
+        executorData.putAll(env.getTaskHealthCheckConfig());
+        if (!executorData.isEmpty()) {
+            executorBuilder.setData(ByteString.copyFrom(SerializationUtils.serialize(executorData))).build();
         }
         return result.setExecutor(executorBuilder.build()).build();
     }
