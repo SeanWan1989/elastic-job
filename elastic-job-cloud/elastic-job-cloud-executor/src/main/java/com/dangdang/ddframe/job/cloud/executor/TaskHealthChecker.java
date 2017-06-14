@@ -19,9 +19,8 @@ package com.dangdang.ddframe.job.cloud.executor;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.AbstractScheduledService;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.RequiredArgsConstructor;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.Protos;
@@ -31,9 +30,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -58,8 +56,8 @@ class TaskHealthChecker {
     TaskHealthChecker(final ExecutorDriver driver, final int timeout, final int maxTimeouts) {
         this.driver = driver;
         this.timeout = timeout < 1 ? 30 : timeout;
-        this.maxTimeouts = maxTimeouts < 1 ? 5 : timeout;
-        new HealthCheckerService().startAsync();
+        this.maxTimeouts = maxTimeouts < 1 ? 5 : maxTimeouts;
+        Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskHealthChecker-%d").build()).execute(new HealthCheckerService());
     }
     
     private void check() {
@@ -70,14 +68,21 @@ class TaskHealthChecker {
     private void sendRequest() {
         uncheckedTaskIDs.clear();
         uncheckedTaskIDs.addAll(DaemonTaskScheduler.getAllRunningTaskIDs());
-        for (int i = 0; i < maxTimeouts && !uncheckedTaskIDs.isEmpty(); i++) {
+        if (uncheckedTaskIDs.isEmpty()) {
+            await(10);
+        }
+        for (int i = 0; (i < maxTimeouts) && !uncheckedTaskIDs.isEmpty(); i++) {
             for (String each : uncheckedTaskIDs) {
                 driver.sendFrameworkMessage(new Message("HEALTH_CHECK", version.get(), each).marshall());
             }
-            try {
-                wait(timeout * 1000);
-            } catch (final InterruptedException ignored) {
-            }
+            await(timeout);
+        }
+    }
+    
+    private void await(final int seconds) {
+        try {
+            Thread.sleep(seconds * 1000);
+        } catch (final InterruptedException ignored) {
         }
     }
     
@@ -88,7 +93,7 @@ class TaskHealthChecker {
         retainUnhealthyTaskIDs.addAll(uncheckedTaskIDs);
         for (String each : retainUnhealthyTaskIDs) {
             DaemonTaskScheduler.shutdown(Protos.TaskID.newBuilder().setValue(each).build());
-            driver.sendStatusUpdate(Protos.TaskStatus.newBuilder().setTaskId(Protos.TaskID.newBuilder().setValue(each)).setState(Protos.TaskState.TASK_UNKNOWN).setMessage("HEALTH_CHECK").build());
+            driver.sendStatusUpdate(Protos.TaskStatus.newBuilder().setTaskId(Protos.TaskID.newBuilder().setValue(each)).setState(Protos.TaskState.TASK_ERROR).setMessage("HEALTH_CHECK").build());
         }
     }
     
@@ -99,27 +104,18 @@ class TaskHealthChecker {
         }
     }
     
-    private class HealthCheckerService extends AbstractScheduledService {
+    private class HealthCheckerService implements Runnable {
         
         @Override
-        protected void runOneIteration() throws Exception {
-            try {
-                check();
-                //CHECKSTYLE:OFF
-            } catch (final Throwable throwable) {
-                //CHECKSTYLE:ON
-                driver.sendFrameworkMessage(Throwables.getStackTraceAsString(throwable).getBytes());
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    check();
+                    //CHECKSTYLE:OFF
+                } catch (final Throwable ignored) {
+                    //CHECKSTYLE:ON
+                }
             }
-        }
-    
-        @Override
-        protected Scheduler scheduler() {
-            return Scheduler.newFixedDelaySchedule(60, 1, TimeUnit.SECONDS);
-        }
-    
-        @Override
-        protected ScheduledExecutorService executor() {
-            return super.executor();
         }
     }
     
