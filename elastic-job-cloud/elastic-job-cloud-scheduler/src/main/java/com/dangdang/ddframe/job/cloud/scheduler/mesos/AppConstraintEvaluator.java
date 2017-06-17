@@ -77,7 +77,7 @@ public final class AppConstraintEvaluator implements ConstraintEvaluator {
             for (MesosStateService.ExecutorStateInfo each : facadeService.loadExecutorInfo()) {
                 runningApps.add(each.getId());
             }
-        } catch (final JSONException | UniformInterfaceException | ClientHandlerException e) {
+        } catch (final UniformInterfaceException | ClientHandlerException e) {
             clearAppRunningState();
         }
     }
