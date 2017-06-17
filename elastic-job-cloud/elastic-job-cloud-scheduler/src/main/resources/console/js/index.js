@@ -11,7 +11,11 @@ $(function() {
         $("#content-right").load("/html/job/jobs_overview.html");
     });
     $("#status").click(function() {
-        $("#content-right").load("/html/job/job_status.html");
+        $("#content-right").load("/html/job/job_status.html", null, function(){
+            $("table").bootstrapTable().on("all.bs.table", function() {
+                doLocale();
+            });
+        });
     });
     $("#dashboard").click(function() {
         $("#content-right").load("/html/history/job_dashboard.html");
@@ -25,4 +29,5 @@ $(function() {
     $("#nodes").click(function() {
         $("#content-right").load("/html/cluster/cluster_overview.html");
     });
+    switchLanguage();
 });

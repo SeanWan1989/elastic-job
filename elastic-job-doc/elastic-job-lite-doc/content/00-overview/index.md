@@ -71,11 +71,15 @@ Elastic-Job-Lite定位为轻量级无中心化解决方案，使用jar包的形�
 
 ## [当当](http://www.dangdang.com/)
 
+## [国美](http://www.gome.com.cn/))
+
 ## [记健康](http://www.jjklife.com/)
 
 ## [简理财](http://www.jianlc.com/)
 
 ## [茧数科技](http://a-crm.cn/)
+
+## [金柚网](https://www.joyowo.com/)
 
 ## [就医160](http://www.91160.com/)
 
@@ -84,6 +88,8 @@ Elastic-Job-Lite定位为轻量级无中心化解决方案，使用jar包的形�
 ## [拉手网](http://www.lashou.com/)
 
 ## [懒人听书](www.lrts.me/)
+
+## [捞财宝(证大爱特)](https://www.laocaibao.com)
 
 ## [米袋集团](http://www.midaigroup.com/)
 
@@ -105,6 +111,8 @@ Elastic-Job-Lite定位为轻量级无中心化解决方案，使用jar包的形�
 
 ## [亚信](http://www.asiainfo.com.cn/)
 
+## [耀莱在线](https://www.yaolaivip.com/)
+
 ## [一加手机](http://www.oneplus.cn/)
 
 ## [蚁坊软件](http://www.eefung.com/)
@@ -117,6 +125,8 @@ Elastic-Job-Lite定位为轻量级无中心化解决方案，使用jar包的形�
 
 ## [有货网](http://www.yohobuy.com/)
 
+## [有信电话](http://www.uxin.com/)
+
 ## [云猴网](http://www.yunhou.com/)
 
 ## [浙江电子口岸](http://www.zjport.gov.cn/)
@@ -124,6 +134,8 @@ Elastic-Job-Lite定位为轻量级无中心化解决方案，使用jar包的形�
 ## [浙金网](https://www.zjmax.com/)
 
 ## [中国平安](http://www.pingan.com/)
+
+## [猪八戒网](http://www.zbj.com/)
 
 ## [赚啦理财](http://www.zhuanlalicai.com/)
 

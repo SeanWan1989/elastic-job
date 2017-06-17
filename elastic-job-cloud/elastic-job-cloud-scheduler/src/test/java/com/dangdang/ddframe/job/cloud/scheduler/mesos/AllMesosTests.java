@@ -36,7 +36,8 @@ import org.junit.runners.Suite;
         MesosStateServiceTest.class,
         ReconcileServiceTest.class,
         MesosSlaveServiceTest.class,
-        MesosEndpointServiceTest.class
+        MesosEndpointServiceTest.class,
+        AppConstraintEvaluatorTest.class
     })
 public final class AllMesosTests {
 }

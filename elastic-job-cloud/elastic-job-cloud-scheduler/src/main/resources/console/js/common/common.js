@@ -132,3 +132,45 @@ Date.prototype.format=function(fmt) {
     }
     return fmt;
 }
+
+function i18n(lang) {
+    jQuery.i18n.properties({
+        name : 'message',
+        path : '/i18n/',
+        mode : 'map',
+        language : lang,
+        cache: true,
+        encoding: 'UTF-8',
+        callback : function() {
+            for (var i in $.i18n.map) {
+                $('[data-lang="'+i+'"]').html($.i18n.prop(i));
+            }
+        }
+    });
+}
+
+function doLocale() {
+    if ($("#content-right").hasClass("lang-en")) {
+        i18n("en");
+    } else {
+        i18n("zh");
+    }
+}
+
+function switchLanguage() {
+    $("#lang-zh").click(function() {
+        $("#content-right").removeClass("lang-en").addClass("lang-zh");
+        doLocale();
+    });
+    $("#lang-en").click(function() {
+        $("#content-right").removeClass("lang-zh").addClass("lang-en");
+        doLocale();
+    });
+}
+
+function tooltipLocale(){
+    for (var i = 0; i < $("[data-toggle='tooltip']").length; i++) {
+        var object = $("[data-toggle='tooltip']")[i];
+        $(object).attr('title',$.i18n.prop("placeholder-" + object.getAttribute("id"))).tooltip('fixTitle');
+    }
+}

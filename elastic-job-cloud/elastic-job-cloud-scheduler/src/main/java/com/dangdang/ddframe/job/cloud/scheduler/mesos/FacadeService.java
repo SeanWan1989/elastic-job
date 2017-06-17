@@ -75,7 +75,7 @@ public final class FacadeService {
     private final DisableJobService disableJobService;
     
     private final MesosStateService mesosStateService;
-
+    
     public FacadeService(final CoordinatorRegistryCenter regCenter) {
         appConfigService = new CloudAppConfigurationService(regCenter);
         jobConfigService = new CloudJobConfigurationService(regCenter);
@@ -301,7 +301,7 @@ public final class FacadeService {
     private Collection<TaskContext> getJobRunningTasks(final String jobName) {
         return runningService.getRunningTasks(jobName);
     }
-
+    
     /**
      * 获取待失效转移的全部任务.
      *
@@ -320,7 +320,7 @@ public final class FacadeService {
     private Collection<FailoverTaskInfo> getJobFailoverTasks(final String jobName) {
         return failoverService.getFailoverTasks(jobName);
     }
-
+    
     /**
      * 判断作业是否被禁用.
      * 
@@ -359,7 +359,7 @@ public final class FacadeService {
     private String getHostNameByTaskId(final String taskId) {
         return runningService.getHostNameByTaskId(taskId);
     }
-
+    
     /**
      * 根据任务主键判断zk中是否存在running节点.
      *
@@ -369,7 +369,7 @@ public final class FacadeService {
     private boolean getRunningTaskInZookeeper(final String taskId) {
         return runningService.getRunningTaskInZookeeper(taskId);
     }
-
+    
     /**
      * 获取360视图任务数据.
      *
@@ -408,7 +408,16 @@ public final class FacadeService {
         }
         return result;
     }
-
+    
+    /**
+     * 获取所有正在运行的Executor的信息.
+     * 
+     * @return Executor信息集合
+     */
+    public Collection<MesosStateService.ExecutorStateInfo> loadExecutorInfo() {
+        return mesosStateService.executors();
+    }
+    
     /**
      * 停止门面服务.
      */

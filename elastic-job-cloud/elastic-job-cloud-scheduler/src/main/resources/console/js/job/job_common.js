@@ -10,11 +10,11 @@ function validate() {
             jobClass: {
                 validators: {
                     notEmpty: {
-                        message: "作业实现类不能为空"
+                        message: $.i18n.prop("job-class-not-null")
                     },
                     regexp: {
                         regexp: /^[\w\.]+$/,
-                        message: "作业实现类只能使用数字、字母、下划线(_)和点号(.)"
+                        message: $.i18n.prop("job-class-regexp-limit")
                     }
                 }
             },
@@ -22,21 +22,18 @@ function validate() {
                 jobNameCheck: true,
                 validators: {
                     notEmpty: {
-                        message: "作业名称不能为空"
+                        message: $.i18n.prop("job-name-not-null")
                     },
                     stringLength: {
                         max: 100,
-                        message: "作业名称长度不能超过100字符大小"
-                    },
-                    regexp: {
-                        regexp: /^[\w\.-]+$/,
-                        message: "作业名称只能使用数字、字母、下划线(_)、短横线(-)和点号(.)"
+                        message: $.i18n.prop("job-name-length-limit")
                     },
                     callback: {
-                        message: "作业名称已经注册",
+                        message: $.i18n.prop("job-name-exists"),
                         callback: function () {
                             var jobName = $("#job-name").val();
                             var result = true;
+                            if ("" !== jobName) {
                                 $.ajax({
                                     url: "/api/job/jobs/" + jobName,
                                     contentType: "application/json",
@@ -47,6 +44,7 @@ function validate() {
                                         }
                                     }
                                 });
+                            }
                             return result;
                         }
                     }
@@ -55,7 +53,7 @@ function validate() {
             jobAppName: {
                 validators: {
                     callback: {
-                        message: "应用未注册",
+                        message: $.i18n.prop("app-name-unregistered"),
                         callback: function (validator) {
                             var appName = $("#job-app-name").val();
                             var result = false;
@@ -78,35 +76,35 @@ function validate() {
                 validators: {
                     stringLength: {
                         max: 40,
-                        message: "cron表达式不能超过40字符大小"
+                        message: $.i18n.prop("job-cron-length-limit")
                     },
                     notEmpty: {
-                        message: "cron表达式不能为空"
+                        message: $.i18n.prop("job-cron-not-null")
                     }
                 }
             },
             cpuCount: {
                 validators: {
                     notEmpty: {
-                        message: "cpu数量不能为空"
+                        message: $.i18n.prop("job-cpu-count-not-null")
                     },
                     regexp: {
                         regexp: /^(-?\d+)(\.\d+)?$/,
-                        message: "cpu数量只能包含数字和小数点"
+                        message: $.i18n.prop("job-cpu-count-regexp-limit")
                     }
                 }
             },
             jobMemory: {
                 validators: {
                     notEmpty: {
-                        message: "单片作业内存不能为空"
+                        message: $.i18n.prop("job-memory-not-null")
                     }
                 }
             },
             shardingTotalCount: {
                 validators: {
                     notEmpty: {
-                        message: "分片数不能为空"
+                        message: $.i18n.prop("job-sharding-count-not-null")
                     }
                 }
             },
@@ -121,7 +119,7 @@ function validate() {
             scriptCommandLine: {
                 validators: {
                     notEmpty: {
-                        message: "SCRIPT类型作业命令行执行脚本不能为空"
+                        message: $.i18n.prop("job-script-command-line-not-null")
                     }
                 }
             },
@@ -129,8 +127,8 @@ function validate() {
                 validators: {
                     regexp: {
                         regexp: /^(\d+)=(\w+)(,(\d+)=(\w+))*$/,
-                        message: "作业分片项格式不正确且只包含数字、字母、逗号"
-                    },
+                        message: $.i18n.prop("job-sharding-item-parameters-regexp-limit")
+                    }
                 }
             }
         }
