@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.gson.Gson;
 import com.sun.jersey.api.client.Client;
 
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
 /**
  * Mesos Endpoint服务.
  *
@@ -35,7 +37,7 @@ public final class MesosEndpointService {
     
     private static MesosEndpointService instance = new MesosEndpointService();
     
-    private Optional<String> masterUrl;
+    private String masterUrl;
     
     private MesosEndpointService() { }
     
@@ -50,14 +52,23 @@ public final class MesosEndpointService {
      * @param port Master端口
      */
     public synchronized void register(final String hostName, final int port) {
-        masterUrl = Optional.of(String.format("http://%s:%d", hostName, port));
+        masterUrl = String.format("http://%s:%d", hostName, port);
     }
     
     /**
      * 注销Mesos的Master信息.
      */
     public synchronized void deregister() {
-        masterUrl = Optional.<String>absent();
+        masterUrl = null;
+    }
+    
+    /**
+     * 服务是否有效.
+     * 
+     * @return 服务是否有效.
+     */
+    public boolean isValid() {
+        return null != masterUrl;
     }
     
     /**
@@ -68,10 +79,10 @@ public final class MesosEndpointService {
      */
     @SuppressWarnings("unchecked")
     public <T> Optional<T> slaves(final Class<T> clazz) {
-        if (!masterUrl.isPresent()) {
+        if (null == masterUrl) {
             return Optional.absent();
         }
-        String result = get(masterUrl.get() + "/slaves");
+        String result = get(masterUrl + "/slaves");
         if (clazz != String.class) {
             return Optional.of(new Gson().fromJson(result, clazz));
         }
@@ -85,10 +96,10 @@ public final class MesosEndpointService {
      * @return endpoint调用结果
      */
     public <T> Optional<T> state(final Class<T> clazz) {
-        if (!masterUrl.isPresent()) {
+        if (null == masterUrl) {
             return Optional.absent();
         }
-        return state(masterUrl.get(), clazz);
+        return state(masterUrl, clazz);
     }
 
     /**

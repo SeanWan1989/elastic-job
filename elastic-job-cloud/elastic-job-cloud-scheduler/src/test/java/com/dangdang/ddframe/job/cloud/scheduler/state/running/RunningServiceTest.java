@@ -20,6 +20,7 @@ package com.dangdang.ddframe.job.cloud.scheduler.state.running;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
 import com.dangdang.ddframe.job.cloud.scheduler.fixture.CloudJsonConstants;
 import com.dangdang.ddframe.job.cloud.scheduler.fixture.TaskNode;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosEndpointService;
 import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosStateService;
 import com.dangdang.ddframe.job.context.ExecutionType;
 import com.dangdang.ddframe.job.context.TaskContext;
@@ -79,7 +80,7 @@ public final class RunningServiceTest {
     }
     
     @Test
-    public void assertStart() throws NoSuchFieldException {
+    public void assertStart() throws NoSuchFieldException, InterruptedException {
         TaskNode taskNode1 = TaskNode.builder().jobName("test_job").shardingItem(0).slaveId("111").type(ExecutionType.READY).uuid(UUID.randomUUID().toString()).build();
         TaskNode taskNode2 = TaskNode.builder().jobName("test_job").shardingItem(1).slaveId("222").type(ExecutionType.FAILOVER).uuid(UUID.randomUUID().toString()).build();
         TaskContext task1 = TaskContext.from(taskNode1.getTaskNodeValue());
@@ -92,7 +93,9 @@ public final class RunningServiceTest {
         when(mesosStateService.getTaskHostname(task1.getSlaveId())).thenReturn("host1");
         when(mesosStateService.getTaskHostname(task2.getSlaveId())).thenReturn("host2");
         ReflectionUtils.setFieldValue(runningService, "mesosStateService", mesosStateService);
+        MesosEndpointService.getInstance().register("localhost", 5050);
         runningService.start();
+        Thread.sleep(5000);
         assertThat(runningService.getAllRunningDaemonTasks().size(), is(2));
         assertThat(runningService.getHostNameByTaskId(task1.getId()), is("host1"));
         assertThat(runningService.getHostNameByTaskId(task2.getId()), is("host2"));

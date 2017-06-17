@@ -20,6 +20,7 @@ package com.dangdang.ddframe.job.cloud.scheduler.state.running;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfiguration;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfigurationService;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosEndpointService;
 import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosStateService;
 import com.dangdang.ddframe.job.context.TaskContext;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
@@ -29,6 +30,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -39,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executors;
 
 /**
  * 任务运行时服务.
@@ -83,12 +86,27 @@ public final class RunningService {
                 
                 @Override
                 public TaskContext apply(final String input) {
-                    TaskContext taskContext = TaskContext.from(regCenter.get(RunningNode.getRunningTaskNodePath(TaskContext.MetaInfo.from(input).toString())));
-                    TASK_HOSTNAME_MAPPER.put(taskContext.getId(), mesosStateService.getTaskHostname(taskContext.getSlaveId()));
-                    return taskContext;
+                    return TaskContext.from(regCenter.get(RunningNode.getRunningTaskNodePath(TaskContext.MetaInfo.from(input).toString())));
                 }
             })));
         }
+    
+        Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Init-RunningService-%d").build()).execute(new Runnable() {
+            @Override
+            public void run() {
+                while (!MesosEndpointService.getInstance().isValid()) {
+                    try {
+                        Thread.sleep(5000);
+                    } catch (final InterruptedException ignored) {
+                    }
+                }
+                for (Set<TaskContext> each : RUNNING_TASKS.values()) {
+                    for (TaskContext taskContext : each) {
+                        TASK_HOSTNAME_MAPPER.put(taskContext.getId(), mesosStateService.getTaskHostname(taskContext.getSlaveId()));
+                    }
+                }
+            }
+        });
     }
     
     /**
