@@ -37,6 +37,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.protobuf.ByteString;
+import com.netflix.fenzo.SchedulingResult;
 import com.netflix.fenzo.TaskAssignmentResult;
 import com.netflix.fenzo.TaskRequest;
 import com.netflix.fenzo.TaskScheduler;
@@ -107,9 +108,17 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
             LaunchingTasks launchingTasks = new LaunchingTasks(facadeService.getEligibleJobContext());
             List<TaskRequest> taskRequests = launchingTasks.getPendingTasks();
             if (!taskRequests.isEmpty()) {
+                log.info("Schedule task begin, task requests size is {}", taskRequests.size());
                 AppConstraintEvaluator.getInstance().loadAppRunningState();
             }
-            Collection<VMAssignmentResult> vmAssignmentResults = taskScheduler.scheduleOnce(taskRequests, LeasesQueue.getInstance().drainTo()).getResultMap().values();
+            SchedulingResult schedulingResult = taskScheduler.scheduleOnce(taskRequests, LeasesQueue.getInstance().drainTo());
+            Collection<VMAssignmentResult> vmAssignmentResults = schedulingResult.getResultMap().values();
+            if (!schedulingResult.getExceptions().isEmpty()) {
+                log.warn("Schedule task occurred exceptions: {}", schedulingResult.getExceptions());
+            }
+            if (!schedulingResult.getFailures().isEmpty()) {
+                log.warn("Schedule task occurred failures: {}", schedulingResult.getFailures());
+            }
             List<TaskContext> taskContextsList = new LinkedList<>();
             Map<List<Protos.OfferID>, List<Protos.TaskInfo>> offerIdTaskInfoMap = new HashMap<>();
             for (VMAssignmentResult each: vmAssignmentResults) {
@@ -120,6 +129,9 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
                     taskContextsList.add(TaskContext.from(taskInfo.getTaskId().getValue()));
                 }
                 offerIdTaskInfoMap.put(getOfferIDs(leasesUsed), taskInfoList);
+            }
+            if (taskRequests.size() != taskContextsList.size()) {
+                log.warn("Some tasks scheduled failed, task requests size is {}, successful size is {}", taskRequests.size(), taskContextsList.size());
             }
             for (TaskContext each : taskContextsList) {
                 facadeService.addRunning(each);
