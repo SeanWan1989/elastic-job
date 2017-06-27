@@ -42,6 +42,7 @@ import com.netflix.fenzo.TaskAssignmentResult;
 import com.netflix.fenzo.TaskRequest;
 import com.netflix.fenzo.TaskScheduler;
 import com.netflix.fenzo.VMAssignmentResult;
+import com.netflix.fenzo.VMResource;
 import com.netflix.fenzo.VirtualMachineLease;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -131,7 +132,8 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
                 offerIdTaskInfoMap.put(getOfferIDs(leasesUsed), taskInfoList);
             }
             if (taskRequests.size() != taskContextsList.size()) {
-                log.warn("Some tasks scheduled failed, task requests size is {}, successful size is {}", taskRequests.size(), taskContextsList.size());
+                log.warn("Some tasks scheduled failed, task requests size is {}, successful size is {}, the total resource of task requests is {}, the resource status is {}",
+                        taskRequests.size(), taskContextsList.size(), getTotalRequestInfo(taskRequests), convertResourceStatus(taskScheduler.getResourceStatus()));
             }
             for (TaskContext each : taskContextsList) {
                 facadeService.addRunning(each);
@@ -148,6 +150,34 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
         } finally {
             AppConstraintEvaluator.getInstance().clearAppRunningState();
         }
+    }
+    
+    private Map<String, Double> getTotalRequestInfo(final Collection<TaskRequest> taskRequests) {
+        Map<String, Double> result = new HashMap<>();
+        double totalCUPs = 0.0;
+        double totalMemory = 0.0;
+        for (TaskRequest each : taskRequests) {
+            totalCUPs += each.getCPUs();
+            totalMemory += each.getMemory();
+        }
+        result.put("cpus", totalCUPs);
+        result.put("mem", totalMemory);
+        return result;
+    }
+    
+    private Map<String, Map<VMResource, String>> convertResourceStatus(final Map<String, Map<VMResource, Double[]>> orinalResourceStatus) {
+        Map<String, Map<VMResource, String>> result = new HashMap<>();
+        for (Entry<String, Map<VMResource, Double[]>> eachHostResource : orinalResourceStatus.entrySet()) {
+            Map<VMResource, String> targetResource = new HashMap<>();
+            result.put(eachHostResource.getKey(), targetResource);
+            for (Entry<VMResource, Double[]> eachVMResource : eachHostResource.getValue().entrySet()) {
+                StringBuilder builder = new StringBuilder();
+                builder.append("{used=").append(eachVMResource.getValue()[0]);
+                builder.append(", available=").append(eachVMResource.getValue()[1]).append("}");
+                targetResource.put(eachVMResource.getKey(), builder.toString());
+            }
+        }
+        return result;
     }
     
     private List<Protos.TaskInfo> getTaskInfoList(final Collection<String> integrityViolationJobs, final VMAssignmentResult vmAssignmentResult, final String hostname, final Protos.Offer offer) {
