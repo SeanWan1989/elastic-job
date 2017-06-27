@@ -50,8 +50,6 @@ public final class SchedulerEngine implements Scheduler {
     
     private final StatisticManager statisticManager;
     
-    private final TaskHealthChecker taskHealthChecker;
-    
     public SchedulerEngine(final TaskScheduler taskScheduler, final FacadeService facadeService, final JobEventBus jobEventBus,
             final FrameworkIDService frameworkIDService, final StatisticManager statisticManager) {
         this.taskScheduler = taskScheduler;
@@ -59,7 +57,6 @@ public final class SchedulerEngine implements Scheduler {
         this.jobEventBus = jobEventBus;
         this.frameworkIDService = frameworkIDService;
         this.statisticManager = statisticManager;
-        this.taskHealthChecker = new TaskHealthChecker(facadeService);
     }
     
     @Override
@@ -146,7 +143,6 @@ public final class SchedulerEngine implements Scheduler {
     @Override
     public void frameworkMessage(final SchedulerDriver schedulerDriver, final Protos.ExecutorID executorID, final Protos.SlaveID slaveID, final byte[] bytes) {
         log.trace("call frameworkMessage slaveID: {}, bytes: {}", slaveID, new String(bytes));
-        taskHealthChecker.process(schedulerDriver, executorID, slaveID, bytes);
     }
     
     @Override
