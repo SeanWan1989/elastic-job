@@ -20,8 +20,7 @@ package com.dangdang.ddframe.job.cloud.scheduler.state.running;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfiguration;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfigurationService;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
-import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosEndpointService;
-import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosStateService;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosSlaveService;
 import com.dangdang.ddframe.job.context.TaskContext;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
 import com.google.common.base.Function;
@@ -31,6 +30,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -63,12 +64,12 @@ public final class RunningService {
     
     private final CloudJobConfigurationService configurationService;
     
-    private final MesosStateService mesosStateService;
+    private final MesosSlaveService mesosSlaveService;
     
     public RunningService(final CoordinatorRegistryCenter regCenter) {
         this.regCenter = regCenter;
         this.configurationService = new CloudJobConfigurationService(regCenter);
-        this.mesosStateService = new MesosStateService(regCenter);
+        this.mesosSlaveService = new MesosSlaveService();
     }
     
     /**
@@ -90,19 +91,30 @@ public final class RunningService {
                 }
             })));
         }
-    
+        if (RUNNING_TASKS.isEmpty()) {
+            return;
+        }
         Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Init-RunningService-%d").build()).execute(new Runnable() {
             @Override
             public void run() {
-                while (!MesosEndpointService.getInstance().isValid()) {
+                JsonArray slaves;
+                while ((slaves = mesosSlaveService.findAllSlaves()).size() < 1) {
                     try {
                         Thread.sleep(5000);
                     } catch (final InterruptedException ignored) {
                     }
                 }
                 for (Set<TaskContext> each : RUNNING_TASKS.values()) {
-                    for (TaskContext taskContext : each) {
-                        TASK_HOSTNAME_MAPPER.put(taskContext.getId(), mesosStateService.getTaskHostname(taskContext.getSlaveId()));
+                    for (final TaskContext taskContext : each) {
+                        Optional<JsonElement> slaveOptional = Iterators.tryFind(slaves.iterator(), new Predicate<JsonElement>() {
+                            @Override
+                            public boolean apply(final JsonElement input) {
+                                return input.getAsJsonObject().get("id").getAsString().equals(taskContext.getSlaveId());
+                            }
+                        });
+                        if (slaveOptional.isPresent()) {
+                            TASK_HOSTNAME_MAPPER.putIfAbsent(taskContext.getId(), slaveOptional.get().getAsJsonObject().get("hostname").getAsString());
+                        }
                     }
                 }
             }

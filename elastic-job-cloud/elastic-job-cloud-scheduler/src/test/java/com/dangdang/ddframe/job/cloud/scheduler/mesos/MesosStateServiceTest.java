@@ -81,10 +81,4 @@ public class MesosStateServiceTest extends AbstractCloudRestfulApiTest {
                 + "/executors/foo_app@-@d8701508-41b7-471e-9b32-61cf824a660d-S0"
                 + "/runs/53fb4af7-aee2-44f6-9e47-6f418d9f27e1"));
     }
-    
-    @Test
-    public void assertTaskHostName() {
-        MesosStateService service = new MesosStateService(null);
-        assertThat(service.getTaskHostname("d8701508-41b7-471e-9b32-61cf824a660d-S0"), is("127.0.0.1"));
-    }
 }

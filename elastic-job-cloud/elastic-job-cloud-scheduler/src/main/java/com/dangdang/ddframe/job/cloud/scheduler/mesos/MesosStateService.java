@@ -128,29 +128,7 @@ public class MesosStateService {
         }
         return "";
     }
-
-    /**
-     * 获取主机信息.
-     *
-     * @param slaveId slave主键
-     * @return hostName 主机
-     */
-    public String getTaskHostname(final String slaveId) {
-        Optional<JsonObject> stateOptional = MesosEndpointService.getInstance().state(JsonObject.class);
-        if (!stateOptional.isPresent()) {
-            return "";
-        }
-        JsonArray slaves = stateOptional.get().getAsJsonArray("slaves");
-        String slaveHost = null;
-        for (int i = 0; i < slaves.size(); i++) {
-            JsonObject slave = slaves.get(i).getAsJsonObject();
-            if (slaveId.equals(slave.get("id").getAsString())) {
-                slaveHost = slave.get("hostname").getAsString();
-            }
-        }
-        return slaveHost;
-    }
-
+    
     /**
      * 查找执行器信息.
      * 

@@ -36,7 +36,11 @@ import com.dangdang.ddframe.job.context.TaskContext.MetaInfo;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -76,6 +80,8 @@ public final class FacadeService {
     
     private final MesosStateService mesosStateService;
     
+    private final MesosSlaveService mesosSlaveService;
+    
     public FacadeService(final CoordinatorRegistryCenter regCenter) {
         appConfigService = new CloudAppConfigurationService(regCenter);
         jobConfigService = new CloudJobConfigurationService(regCenter);
@@ -85,6 +91,7 @@ public final class FacadeService {
         disableAppService = new DisableAppService(regCenter);
         disableJobService = new DisableJobService(regCenter);
         mesosStateService = new MesosStateService(regCenter);
+        mesosSlaveService = new MesosSlaveService();
     }
     
     /**
@@ -400,9 +407,19 @@ public final class FacadeService {
             }
         }
         if (failoverTasks.size() > 0) {
+            JsonArray slaves = mesosSlaveService.findAllSlaves();
             for (FailoverTaskInfo each : failoverTasks) {
-                TaskContext taskContext = TaskContext.from(each.getOriginalTaskId());
-                String serverIp = mesosStateService.getTaskHostname(taskContext.getSlaveId());
+                final TaskContext taskContext = TaskContext.from(each.getOriginalTaskId());
+                String serverIp = "";
+                Optional<JsonElement> slaveOptional = Iterators.tryFind(slaves.iterator(), new Predicate<JsonElement>() {
+                    @Override
+                    public boolean apply(final JsonElement input) {
+                        return input.getAsJsonObject().get("id").getAsString().equals(taskContext.getSlaveId());
+                    }
+                });
+                if (slaveOptional.isPresent()) {
+                    serverIp = slaveOptional.get().getAsJsonObject().get("hostname").getAsString();
+                }
                 result.add(new TaskFullViewInfo(taskContext.getId(), serverIp, FAILOVER_STATUS, mesosStateService.getMesosSandbox(appName, taskContext.getExecutorId(appName))));
             }
         }

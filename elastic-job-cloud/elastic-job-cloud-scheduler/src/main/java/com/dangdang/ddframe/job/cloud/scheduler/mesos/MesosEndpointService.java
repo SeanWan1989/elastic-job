@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.gson.Gson;
 import com.sun.jersey.api.client.Client;
 
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 /**
  * Mesos Endpoint服务.
  *
@@ -35,7 +33,7 @@ public final class MesosEndpointService {
     
     private static final int DEFAULT_SO_TIMEOUT = 5 * 1000;
     
-    private static MesosEndpointService instance = new MesosEndpointService();
+    private static final MesosEndpointService instance = new MesosEndpointService();
     
     private String masterUrl;
     
@@ -60,15 +58,6 @@ public final class MesosEndpointService {
      */
     public synchronized void deregister() {
         masterUrl = null;
-    }
-    
-    /**
-     * 服务是否有效.
-     * 
-     * @return 服务是否有效.
-     */
-    public boolean isValid() {
-        return null != masterUrl;
     }
     
     /**
