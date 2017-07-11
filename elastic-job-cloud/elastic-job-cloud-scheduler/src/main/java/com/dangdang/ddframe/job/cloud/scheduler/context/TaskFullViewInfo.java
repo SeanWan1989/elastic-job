@@ -15,17 +15,25 @@
  * </p>
  */
 
-package com.dangdang.ddframe.job.cloud.scheduler.restful;
+package com.dangdang.ddframe.job.cloud.scheduler.context;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-        CloudJobRestfulApiTest.class,
-        CloudAppRestfulApiTest.class,
-        CloudOperationRestfulApiTest.class,
-        CloudClusterRestfulApiTest.class
-        })
-public final class AllRestfulTests {
+/**
+ * 任务360视角bean.
+ *
+ * @author zhangxinguo
+ */
+@RequiredArgsConstructor
+@Getter
+public final class TaskFullViewInfo {
+
+    private final String taskId;
+
+    private final String serverIp;
+
+    private final String taskStatus;
+
+    private final String sandbox;
 }

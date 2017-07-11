@@ -33,6 +33,7 @@ import com.netflix.fenzo.VMAssignmentResult;
 import com.netflix.fenzo.VirtualMachineLease;
 import com.netflix.fenzo.functions.Action1;
 import com.netflix.fenzo.plugins.VMLeaseObject;
+import com.sun.jersey.api.client.UniformInterfaceException;
 import org.apache.mesos.Protos;
 import org.codehaus.jettison.json.JSONException;
 import org.junit.After;
@@ -121,7 +122,7 @@ public final class AppConstraintEvaluatorTest {
     
     @Test
     public void assertGetExecutorError() throws Exception {
-        when(facadeService.loadExecutorInfo()).thenThrow(JSONException.class);
+        when(facadeService.loadExecutorInfo()).thenThrow(UniformInterfaceException.class);
         AppConstraintEvaluator.getInstance().loadAppRunningState();
         SchedulingResult result = taskScheduler.scheduleOnce(getTasks(), Arrays.asList(getLease(0, INSUFFICIENT_CPU, INSUFFICIENT_MEM), getLease(1, INSUFFICIENT_CPU, INSUFFICIENT_MEM)));
         assertThat(result.getResultMap().size(), is(2));

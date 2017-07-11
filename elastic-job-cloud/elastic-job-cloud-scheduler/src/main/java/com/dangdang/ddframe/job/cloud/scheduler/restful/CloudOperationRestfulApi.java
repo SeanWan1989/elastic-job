@@ -17,6 +17,9 @@
 
 package com.dangdang.ddframe.job.cloud.scheduler.restful;
 
+import com.dangdang.ddframe.job.cloud.scheduler.context.TaskFullViewInfo;
+import com.dangdang.ddframe.job.cloud.scheduler.env.BootstrapEnvironment;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.FacadeService;
 import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosStateService;
 import com.dangdang.ddframe.job.cloud.scheduler.mesos.ReconcileService;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
@@ -29,7 +32,12 @@ import org.codehaus.jettison.json.JSONException;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+import java.util.Collection;
+import java.util.Map;
 
 /**
  * 作业云维护服务.
@@ -45,6 +53,8 @@ public final class CloudOperationRestfulApi {
     private static final long RECONCILE_MILLIS_INTERVAL = 10 * 1000L;
     
     private static MesosStateService mesosStateService;
+
+    private static FacadeService facadeService;
     
     private static long lastReconcileTime;
     
@@ -57,6 +67,7 @@ public final class CloudOperationRestfulApi {
     public static void init(final CoordinatorRegistryCenter regCenter, final ReconcileService reconcileService) {
         CloudOperationRestfulApi.reconcileService = reconcileService;
         CloudOperationRestfulApi.mesosStateService = new MesosStateService(regCenter);
+        CloudOperationRestfulApi.facadeService = new FacadeService(regCenter);
     }
     
     /**
@@ -99,5 +110,40 @@ public final class CloudOperationRestfulApi {
     public JsonArray sandbox(@QueryParam("appName") final String appName) throws JSONException {
         Preconditions.checkArgument(!Strings.isNullOrEmpty(appName), "Lack param 'appName'");
         return mesosStateService.sandbox(appName);
+    }
+
+    /**
+     * 获取作业云Mesos角色信息.
+     *
+     * @return mesos role
+     */
+    @GET
+    @Path("/mesosRole")
+    public String getMesosRole() {
+        return BootstrapEnvironment.getInstance().getMesosRole().orNull();
+    }
+
+    /**
+     * 获取360视图作业数据.
+     *
+     * @return 360视图作业数据集合
+     */
+    @GET
+    @Path("/jobFullView/{jobName}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Collection<Map<String, String>> getReadyJobTimes(@PathParam("jobName") final String jobName) throws JSONException {
+        return facadeService.getReadyJobTimes(jobName);
+    }
+
+    /**
+     * 获取360视图任务数据.
+     *
+     * @return 360视图任务数据集合
+     */
+    @GET
+    @Path("/taskFullView/{jobName}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Collection<TaskFullViewInfo> getTaskFullViewInfo(@PathParam("jobName") final String jobName) throws JSONException {
+        return facadeService.getTaskFullViewInfo(jobName);
     }
 }

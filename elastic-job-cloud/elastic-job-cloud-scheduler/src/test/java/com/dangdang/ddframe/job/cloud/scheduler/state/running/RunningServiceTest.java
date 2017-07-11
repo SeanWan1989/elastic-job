@@ -20,15 +20,20 @@ package com.dangdang.ddframe.job.cloud.scheduler.state.running;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
 import com.dangdang.ddframe.job.cloud.scheduler.fixture.CloudJsonConstants;
 import com.dangdang.ddframe.job.cloud.scheduler.fixture.TaskNode;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosEndpointService;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosSlaveService;
 import com.dangdang.ddframe.job.context.ExecutionType;
 import com.dangdang.ddframe.job.context.TaskContext;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.unitils.util.ReflectionUtils;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +44,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -76,15 +82,33 @@ public final class RunningServiceTest {
     }
     
     @Test
-    public void assertStart() {
+    public void assertStart() throws NoSuchFieldException, InterruptedException {
         TaskNode taskNode1 = TaskNode.builder().jobName("test_job").shardingItem(0).slaveId("111").type(ExecutionType.READY).uuid(UUID.randomUUID().toString()).build();
         TaskNode taskNode2 = TaskNode.builder().jobName("test_job").shardingItem(1).slaveId("222").type(ExecutionType.FAILOVER).uuid(UUID.randomUUID().toString()).build();
         when(regCenter.getChildrenKeys(RunningNode.ROOT)).thenReturn(Collections.singletonList("test_job"));
         when(regCenter.getChildrenKeys(RunningNode.getRunningJobNodePath("test_job"))).thenReturn(Arrays.asList(taskNode1.getTaskNodePath(), taskNode2.getTaskNodePath()));
         when(regCenter.get(RunningNode.getRunningTaskNodePath(taskNode1.getTaskNodePath()))).thenReturn(taskNode1.getTaskNodeValue());
         when(regCenter.get(RunningNode.getRunningTaskNodePath(taskNode2.getTaskNodePath()))).thenReturn(taskNode2.getTaskNodeValue());
+        JsonObject slave1 = new JsonObject();
+        JsonObject slave2 = new JsonObject();
+        TaskContext task1 = TaskContext.from(taskNode1.getTaskNodeValue());
+        TaskContext task2 = TaskContext.from(taskNode2.getTaskNodeValue());
+        slave1.addProperty("id", task1.getSlaveId());
+        slave2.addProperty("id", task2.getSlaveId());
+        slave1.addProperty("hostname", "host1");
+        slave2.addProperty("hostname", "host2");
+        JsonArray jsonArray = new JsonArray();
+        jsonArray.add(slave1);
+        jsonArray.add(slave2);
+        MesosSlaveService mesosSlaveService = mock(MesosSlaveService.class);
+        when(mesosSlaveService.findAllSlaves()).thenReturn(jsonArray);
+        ReflectionUtils.setFieldValue(runningService, "mesosSlaveService", mesosSlaveService);
+        MesosEndpointService.getInstance().register("localhost", 5050);
         runningService.start();
+        Thread.sleep(5000);
         assertThat(runningService.getAllRunningDaemonTasks().size(), is(2));
+        assertThat(runningService.getHostNameByTaskId(task1.getId()), is("host1"));
+        assertThat(runningService.getHostNameByTaskId(task2.getId()), is("host2"));
     }
     
     @Test

@@ -37,10 +37,12 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.AbstractScheduledService;
 import com.google.protobuf.ByteString;
+import com.netflix.fenzo.SchedulingResult;
 import com.netflix.fenzo.TaskAssignmentResult;
 import com.netflix.fenzo.TaskRequest;
 import com.netflix.fenzo.TaskScheduler;
 import com.netflix.fenzo.VMAssignmentResult;
+import com.netflix.fenzo.VMResource;
 import com.netflix.fenzo.VirtualMachineLease;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -107,9 +109,17 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
             LaunchingTasks launchingTasks = new LaunchingTasks(facadeService.getEligibleJobContext());
             List<TaskRequest> taskRequests = launchingTasks.getPendingTasks();
             if (!taskRequests.isEmpty()) {
+                log.info("Schedule task begin, task requests size is {}", taskRequests.size());
                 AppConstraintEvaluator.getInstance().loadAppRunningState();
             }
-            Collection<VMAssignmentResult> vmAssignmentResults = taskScheduler.scheduleOnce(taskRequests, LeasesQueue.getInstance().drainTo()).getResultMap().values();
+            SchedulingResult schedulingResult = taskScheduler.scheduleOnce(taskRequests, LeasesQueue.getInstance().drainTo());
+            Collection<VMAssignmentResult> vmAssignmentResults = schedulingResult.getResultMap().values();
+            if (!schedulingResult.getExceptions().isEmpty()) {
+                log.warn("Schedule task occurred exceptions: {}", schedulingResult.getExceptions());
+            }
+            if (!schedulingResult.getFailures().isEmpty()) {
+                log.warn("Schedule task occurred failures: {}", schedulingResult.getFailures());
+            }
             List<TaskContext> taskContextsList = new LinkedList<>();
             Map<List<Protos.OfferID>, List<Protos.TaskInfo>> offerIdTaskInfoMap = new HashMap<>();
             for (VMAssignmentResult each: vmAssignmentResults) {
@@ -120,6 +130,10 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
                     taskContextsList.add(TaskContext.from(taskInfo.getTaskId().getValue()));
                 }
                 offerIdTaskInfoMap.put(getOfferIDs(leasesUsed), taskInfoList);
+            }
+            if (taskRequests.size() != taskContextsList.size()) {
+                log.warn("Some tasks scheduled failed, task requests size is {}, successful size is {}, the total resource of task requests is {}, the resource status is {}",
+                        taskRequests.size(), taskContextsList.size(), getTotalRequestInfo(taskRequests), convertResourceStatus(taskScheduler.getResourceStatus()));
             }
             for (TaskContext each : taskContextsList) {
                 facadeService.addRunning(each);
@@ -136,6 +150,34 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
         } finally {
             AppConstraintEvaluator.getInstance().clearAppRunningState();
         }
+    }
+    
+    private Map<String, Double> getTotalRequestInfo(final Collection<TaskRequest> taskRequests) {
+        Map<String, Double> result = new HashMap<>();
+        double totalCUPs = 0.0;
+        double totalMemory = 0.0;
+        for (TaskRequest each : taskRequests) {
+            totalCUPs += each.getCPUs();
+            totalMemory += each.getMemory();
+        }
+        result.put("cpus", totalCUPs);
+        result.put("mem", totalMemory);
+        return result;
+    }
+    
+    private Map<String, Map<VMResource, String>> convertResourceStatus(final Map<String, Map<VMResource, Double[]>> orinalResourceStatus) {
+        Map<String, Map<VMResource, String>> result = new HashMap<>();
+        for (Entry<String, Map<VMResource, Double[]>> eachHostResource : orinalResourceStatus.entrySet()) {
+            Map<VMResource, String> targetResource = new HashMap<>();
+            result.put(eachHostResource.getKey(), targetResource);
+            for (Entry<VMResource, Double[]> eachVMResource : eachHostResource.getValue().entrySet()) {
+                StringBuilder builder = new StringBuilder();
+                builder.append("{used=").append(eachVMResource.getValue()[0]);
+                builder.append(", available=").append(eachVMResource.getValue()[1]).append("}");
+                targetResource.put(eachVMResource.getKey(), builder.toString());
+            }
+        }
+        return result;
     }
     
     private List<Protos.TaskInfo> getTaskInfoList(final Collection<String> integrityViolationJobs, final VMAssignmentResult vmAssignmentResult, final String hostname, final Protos.Offer offer) {
@@ -213,8 +255,15 @@ public final class TaskLaunchScheduledService extends AbstractScheduledService {
                 .setValue(taskContext.getExecutorId(jobConfig.getAppName()))).setCommand(command)
                 .addResources(buildResource("cpus", appConfig.getCpuCount(), offer.getResourcesList()))
                 .addResources(buildResource("mem", appConfig.getMemoryMB(), offer.getResourcesList()));
+        //CHECKSTYLE:OFF
+        HashMap<String, String> executorData = new HashMap<>();
+        //CHECKSTYLE:ON
         if (env.getJobEventRdbConfiguration().isPresent()) {
-            executorBuilder.setData(ByteString.copyFrom(SerializationUtils.serialize(env.getJobEventRdbConfigurationMap()))).build();
+            executorData.putAll(env.getJobEventRdbConfigurationMap());
+        }
+        executorData.putAll(env.getTaskHealthCheckConfig());
+        if (!executorData.isEmpty()) {
+            executorBuilder.setData(ByteString.copyFrom(SerializationUtils.serialize(executorData))).build();
         }
         return result.setExecutor(executorBuilder.build()).build();
     }

@@ -23,6 +23,7 @@ import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfiguration
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfigurationService;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
 import com.dangdang.ddframe.job.cloud.scheduler.context.JobContext;
+import com.dangdang.ddframe.job.cloud.scheduler.context.TaskFullViewInfo;
 import com.dangdang.ddframe.job.cloud.scheduler.state.disable.app.DisableAppService;
 import com.dangdang.ddframe.job.cloud.scheduler.state.disable.job.DisableJobService;
 import com.dangdang.ddframe.job.cloud.scheduler.state.failover.FailoverService;
@@ -35,10 +36,12 @@ import com.dangdang.ddframe.job.context.TaskContext.MetaInfo;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import lombok.extern.slf4j.Slf4j;
-import org.codehaus.jettison.json.JSONException;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -55,6 +58,12 @@ import java.util.Set;
 @Slf4j
 public final class FacadeService {
     
+    private static final String RUNNING_STATUS = "RUNNING";
+
+    private static final String RUNNING_STATUS_COMMENT = "FRAMEWORK:RUNNING;ZK:MISSING";
+
+    private static final String FAILOVER_STATUS = "FAILOVER";
+
     private final CloudAppConfigurationService appConfigService;
     
     private final CloudJobConfigurationService jobConfigService;
@@ -71,6 +80,8 @@ public final class FacadeService {
     
     private final MesosStateService mesosStateService;
     
+    private final MesosSlaveService mesosSlaveService;
+    
     public FacadeService(final CoordinatorRegistryCenter regCenter) {
         appConfigService = new CloudAppConfigurationService(regCenter);
         jobConfigService = new CloudJobConfigurationService(regCenter);
@@ -80,6 +91,7 @@ public final class FacadeService {
         disableAppService = new DisableAppService(regCenter);
         disableJobService = new DisableJobService(regCenter);
         mesosStateService = new MesosStateService(regCenter);
+        mesosSlaveService = new MesosSlaveService();
     }
     
     /**
@@ -283,6 +295,16 @@ public final class FacadeService {
     }
     
     /**
+     * 获取待运行作业次数.
+     *
+     * @param jobName 作业名称
+     * @return 待运行作业次数
+     */
+    public Collection<Map<String, String>> getReadyJobTimes(final String jobName) {
+        return readyService.getReadyJobTimes(jobName);
+    }
+    
+    /**
      * 获取所有运行中的任务.
      *
      * @return 运行中任务集合
@@ -292,12 +314,32 @@ public final class FacadeService {
     }
     
     /**
+     * 获取作业所有运行中的任务.
+     *
+     * @param jobName 作业名称
+     * @return 运行中任务集合
+     */
+    private Collection<TaskContext> getJobRunningTasks(final String jobName) {
+        return runningService.getRunningTasks(jobName);
+    }
+    
+    /**
      * 获取待失效转移的全部任务.
      *
      * @return 待失效转移的全部任务
      */
     public Map<String, Collection<FailoverTaskInfo>> getAllFailoverTasks() {
         return failoverService.getAllFailoverTasks();
+    }
+    
+    /**
+     * 获取作业待失效转移的任务.
+     *
+     * @param jobName 作业名称
+     * @return 待失效转移任务集合
+     */
+    private Collection<FailoverTaskInfo> getJobFailoverTasks(final String jobName) {
+        return failoverService.getFailoverTasks(jobName);
     }
     
     /**
@@ -330,11 +372,80 @@ public final class FacadeService {
     }
     
     /**
+     * 根据任务主键获取主机名称.
+     *
+     * @param taskId 任务主键
+     * @return hostName 主机名称
+     */
+    private String getHostNameByTaskId(final String taskId) {
+        return runningService.getHostNameByTaskId(taskId);
+    }
+    
+    /**
+     * 根据任务主键判断zk中是否存在running节点.
+     *
+     * @param taskId 任务主键
+     * @return running节点中是否存在
+     */
+    private boolean getRunningTaskInZookeeper(final String taskId) {
+        return runningService.getRunningTaskInZookeeper(taskId);
+    }
+    
+    /**
+     * 获取360视图任务数据.
+     *
+     * @param jobName 作业名称
+     * @return 360视图任务数据集合
+     */
+    public Collection<TaskFullViewInfo> getTaskFullViewInfo(final String jobName) {
+        Optional<CloudJobConfiguration> cloudJobConfigurationOptional = this.load(jobName);
+        CloudJobConfiguration cloudJobConfiguration;
+        String appName = null;
+        CloudJobExecutionType cloudJobExecutionType = null;
+        if (cloudJobConfigurationOptional.isPresent()) {
+            cloudJobConfiguration = cloudJobConfigurationOptional.get();
+            appName = cloudJobConfiguration.getAppName();
+            cloudJobExecutionType = cloudJobConfiguration.getJobExecutionType();
+        }
+        Collection<TaskContext> runningTasks = this.getJobRunningTasks(jobName);
+        Collection<FailoverTaskInfo> failoverTasks = this.getJobFailoverTasks(jobName);
+        Collection<TaskFullViewInfo> result = Lists.newArrayList();
+        if (runningTasks.size() > 0) {
+            for (TaskContext each : runningTasks) {
+                String statusInfo = RUNNING_STATUS;
+                if (null != cloudJobExecutionType && cloudJobExecutionType.equals(CloudJobExecutionType.DAEMON) && !this.getRunningTaskInZookeeper(each.getId())) {
+                    statusInfo = RUNNING_STATUS_COMMENT;
+                }
+                String taskId = each.getId();
+                result.add(new TaskFullViewInfo(taskId, this.getHostNameByTaskId(taskId), statusInfo, mesosStateService.getMesosSandbox(appName, each.getExecutorId(appName))));
+            }
+        }
+        if (failoverTasks.size() > 0) {
+            JsonArray slaves = mesosSlaveService.findAllSlaves();
+            for (FailoverTaskInfo each : failoverTasks) {
+                final TaskContext taskContext = TaskContext.from(each.getOriginalTaskId());
+                String serverIp = "";
+                Optional<JsonElement> slaveOptional = Iterators.tryFind(slaves.iterator(), new Predicate<JsonElement>() {
+                    @Override
+                    public boolean apply(final JsonElement input) {
+                        return input.getAsJsonObject().get("id").getAsString().equals(taskContext.getSlaveId());
+                    }
+                });
+                if (slaveOptional.isPresent()) {
+                    serverIp = slaveOptional.get().getAsJsonObject().get("hostname").getAsString();
+                }
+                result.add(new TaskFullViewInfo(taskContext.getId(), serverIp, FAILOVER_STATUS, mesosStateService.getMesosSandbox(appName, taskContext.getExecutorId(appName))));
+            }
+        }
+        return result;
+    }
+    
+    /**
      * 获取所有正在运行的Executor的信息.
      * 
      * @return Executor信息集合
      */
-    public Collection<MesosStateService.ExecutorStateInfo> loadExecutorInfo() throws JSONException {
+    public Collection<MesosStateService.ExecutorStateInfo> loadExecutorInfo() {
         return mesosStateService.executors();
     }
     

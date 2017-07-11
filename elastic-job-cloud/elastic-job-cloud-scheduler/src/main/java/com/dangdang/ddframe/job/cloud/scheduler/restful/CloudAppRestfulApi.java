@@ -220,14 +220,10 @@ public final class CloudAppRestfulApi {
     }
     
     private void stopExecutors(final String appName) {
-        try {
-            Collection<ExecutorStateInfo> executorBriefInfo = mesosStateService.executors(appName);
-            for (ExecutorStateInfo each : executorBriefInfo) {
-                producerManager.sendFrameworkMessage(ExecutorID.newBuilder().setValue(each.getId()).build(),
-                        SlaveID.newBuilder().setValue(each.getSlaveId()).build(), "STOP".getBytes());
-            }
-        } catch (final JSONException ex) {
-            throw new JobSystemException(ex);
+        Collection<ExecutorStateInfo> executorBriefInfo = mesosStateService.executors(appName);
+        for (ExecutorStateInfo each : executorBriefInfo) {
+            producerManager.sendFrameworkMessage(ExecutorID.newBuilder().setValue(each.getId()).build(),
+                    SlaveID.newBuilder().setValue(each.getSlaveId()).build(), "STOP".getBytes());
         }
     }
 }

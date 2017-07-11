@@ -1,0 +1,52 @@
+<div class="content-wrapper">
+    <div class="page-height-min">
+        <section class="content-header">
+            <h1>工作机状态</h1>
+            <ol class="breadcrumb">
+                <li class="active"><i class="fa fa-cloud"></i> 集群</li>
+                <li class="active">工作机</li>
+            </ol>
+        </section>
+        <section class="content">
+            <div id="cluster-toolbar-div">
+                <div class="form-inline" role="form">
+                    <div class="form-group toolbar">
+                        <label for="role-name">角色名称:</label>
+                        <input type="text" class="form-control" id="role-name" placeholder="">
+                    </div>
+                </div>
+            </div>
+            <table id="mesos-slave-table" 
+                     data-show-refresh="true"
+                data-show-toggle="true"
+                data-striped="true"
+                data-toggle="table"
+                data-url="/api/cluster/nodes"
+                data-flat="true"
+                data-click-to-select="true"
+                data-search="true"
+                data-strict-search="false"
+                data-query-params="queryParams"
+                data-query-params-type="notLimit"
+                data-pagination="true"
+                data-page-list="[10, 20, 50, 100]"
+                data-show-columns="true"
+                data-toolbar="#cluster-toolbar-div">
+                <thead>
+                    <tr>
+                        <th data-field="hostname" data-sortable="true" data-formatter="hostnameFormatter">Host</th>
+                        <th data-field="use_resources.cpus" data-sortable="true" data-formatter="cpuFormatter">CPUS(Used / Offered / Total)</th>
+                        <th data-field="roles" data-sortable="true" data-formatter="cpuRolesFormatter">CPUS(Used / Offered / Reserved)</th>
+                        <th data-field="use_resources.mem" data-sortable="true" data-formatter="memoryFormatter">Mem(Used / Offered / Total)</th>
+                        <th data-field="roles" data-sortable="true" data-formatter="memoryRolesFormatter">Mem(Used / Offered / Reserved)</th>
+                        <th data-field="registered_time" data-sortable="true" data-formatter="twoRegisteredTimeFormatter">Registerd(Re)</th>
+                    </tr>
+                </thead>
+            </table>
+        </section>
+    </div>
+</div>
+<script src="lib/bootstrap-table/bootstrap-table.min.js"></script>
+<script src="lib/bootstrap-table/bootstrap-table-zh-CN.js"></script>
+<script src="js/common/common.js"></script>
+<script src="js/cluster/cluster_overview.js"></script>

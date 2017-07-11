@@ -1,5 +1,7 @@
 $(function() {
-    $("#content-right").load("/html/app/apps_overview.html");
+    $("#content-right").load("/html/app/apps_overview.html", function() {
+        getMesosRole();
+    });
     refreshJobNavTag();
     refreshAppNavTag();
     $("#register-app").click(function() {
@@ -23,6 +25,9 @@ $(function() {
     });
     $("#exec-status").click(function() {
         $("#content-right").load("/html/history/job_exec_status.html");
+    });
+    $("#nodes").click(function() {
+        $("#content-right").load("/html/cluster/cluster_overview.html");
     });
     switchLanguage();
 });

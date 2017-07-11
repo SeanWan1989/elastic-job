@@ -17,7 +17,6 @@
 
 package com.dangdang.ddframe.job.cloud.scheduler.statistics.job;
 
-
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;

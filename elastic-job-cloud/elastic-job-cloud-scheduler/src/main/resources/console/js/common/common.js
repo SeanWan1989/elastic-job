@@ -101,6 +101,38 @@ function authorityControl() {
     });
 }
 
+function getMesosRole() {
+    $.ajax({
+        url: "/api/operate/mesosRole",
+        type: "GET",
+        success: function (data) {
+            if (null !== data) {
+                $("#mesos-role").text(data);
+            }
+        }
+    });
+}
+
+Date.prototype.format=function(fmt) {
+    var date = {
+    "M+" : this.getMonth() + 1,
+    "d+" : this.getDate(),
+    "h+" : this.getHours() % 12 == 0 ? 12 : this.getHours() % 12,
+    "H+" : this.getHours(),
+    "m+" : this.getMinutes(),
+    "s+" : this.getSeconds(),
+    };
+    if(/(y+)/.test(fmt)) {
+        fmt=fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+    }
+    for(var each in date) {
+        if(new RegExp("(" + each + ")").test(fmt)) {
+            fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (date[each]) : (("00" + date[each]).substr(("" + date[each]).length)));
+        }
+    }
+    return fmt;
+}
+
 function i18n(lang) {
     jQuery.i18n.properties({
         name : 'message',

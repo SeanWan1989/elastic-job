@@ -25,7 +25,6 @@ import com.dangdang.ddframe.job.event.type.JobStatusTraceEvent;
 import com.dangdang.ddframe.job.event.type.JobStatusTraceEvent.Source;
 import com.dangdang.ddframe.job.event.type.JobStatusTraceEvent.State;
 import com.netflix.fenzo.TaskScheduler;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Scheduler;
@@ -38,7 +37,6 @@ import java.util.List;
  *
  * @author zhangliang
  */
-@RequiredArgsConstructor
 @Slf4j
 public final class SchedulerEngine implements Scheduler {
     
@@ -52,19 +50,28 @@ public final class SchedulerEngine implements Scheduler {
     
     private final StatisticManager statisticManager;
     
+    public SchedulerEngine(final TaskScheduler taskScheduler, final FacadeService facadeService, final JobEventBus jobEventBus,
+            final FrameworkIDService frameworkIDService, final StatisticManager statisticManager) {
+        this.taskScheduler = taskScheduler;
+        this.facadeService = facadeService;
+        this.jobEventBus = jobEventBus;
+        this.frameworkIDService = frameworkIDService;
+        this.statisticManager = statisticManager;
+    }
+    
     @Override
     public void registered(final SchedulerDriver schedulerDriver, final Protos.FrameworkID frameworkID, final Protos.MasterInfo masterInfo) {
         log.info("call registered");
         frameworkIDService.save(frameworkID.getValue());
         taskScheduler.expireAllLeases();
-        MesosStateService.register(masterInfo.getHostname(), masterInfo.getPort());
+        MesosEndpointService.getInstance().register(masterInfo.getHostname(), masterInfo.getPort());
     }
     
     @Override
     public void reregistered(final SchedulerDriver schedulerDriver, final Protos.MasterInfo masterInfo) {
         log.info("call reregistered");
         taskScheduler.expireAllLeases();
-        MesosStateService.register(masterInfo.getHostname(), masterInfo.getPort());
+        MesosEndpointService.getInstance().register(masterInfo.getHostname(), masterInfo.getPort());
     }
     
     @Override
@@ -149,7 +156,7 @@ public final class SchedulerEngine implements Scheduler {
     @Override
     public void disconnected(final SchedulerDriver schedulerDriver) {
         log.warn("call disconnected");
-        MesosStateService.deregister();
+        MesosEndpointService.getInstance().deregister();
     }
     
     @Override

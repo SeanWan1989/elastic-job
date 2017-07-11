@@ -20,6 +20,7 @@ package com.dangdang.ddframe.job.cloud.scheduler.state.running;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfiguration;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobConfigurationService;
 import com.dangdang.ddframe.job.cloud.scheduler.config.job.CloudJobExecutionType;
+import com.dangdang.ddframe.job.cloud.scheduler.mesos.MesosSlaveService;
 import com.dangdang.ddframe.job.context.TaskContext;
 import com.dangdang.ddframe.job.reg.base.CoordinatorRegistryCenter;
 import com.google.common.base.Function;
@@ -28,6 +29,9 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executors;
 
 /**
  * 任务运行时服务.
@@ -59,9 +64,12 @@ public final class RunningService {
     
     private final CloudJobConfigurationService configurationService;
     
+    private final MesosSlaveService mesosSlaveService;
+    
     public RunningService(final CoordinatorRegistryCenter regCenter) {
         this.regCenter = regCenter;
         this.configurationService = new CloudJobConfigurationService(regCenter);
+        this.mesosSlaveService = new MesosSlaveService();
     }
     
     /**
@@ -83,6 +91,34 @@ public final class RunningService {
                 }
             })));
         }
+        if (RUNNING_TASKS.isEmpty()) {
+            return;
+        }
+        Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Init-RunningService-%d").build()).execute(new Runnable() {
+            @Override
+            public void run() {
+                JsonArray slaves;
+                while ((slaves = mesosSlaveService.findAllSlaves()).size() < 1) {
+                    try {
+                        Thread.sleep(5000);
+                    } catch (final InterruptedException ignored) {
+                    }
+                }
+                for (Set<TaskContext> each : RUNNING_TASKS.values()) {
+                    for (final TaskContext taskContext : each) {
+                        Optional<JsonElement> slaveOptional = Iterators.tryFind(slaves.iterator(), new Predicate<JsonElement>() {
+                            @Override
+                            public boolean apply(final JsonElement input) {
+                                return input.getAsJsonObject().get("id").getAsString().equals(taskContext.getSlaveId());
+                            }
+                        });
+                        if (slaveOptional.isPresent()) {
+                            TASK_HOSTNAME_MAPPER.putIfAbsent(taskContext.getId(), slaveOptional.get().getAsJsonObject().get("hostname").getAsString());
+                        }
+                    }
+                }
+            }
+        });
     }
     
     /**
@@ -258,6 +294,44 @@ public final class RunningService {
         return TASK_HOSTNAME_MAPPER.remove(taskId);
     }
     
+    /**
+     * 根据任务主键获取主机名称.
+     *
+     * @param taskId 任务主键
+     * @return hostName 主机名称
+     */
+    public String getHostNameByTaskId(final String taskId) {
+        return TASK_HOSTNAME_MAPPER.get(taskId);
+    }
+
+    /**
+     * 根据任务主键判断zk中是否存在running节点.
+     *
+     * @param taskId 任务主键
+     * @return running节点中是否存在
+     */
+    public boolean getRunningTaskInZookeeper(final String taskId) {
+        List<String> jobKeys = regCenter.getChildrenKeys(RunningNode.ROOT);
+        boolean taskExistFlag = false;
+        if (0 == jobKeys.size()) {
+            return false;
+        }
+        for (String each : jobKeys) {
+            if (taskId.split("@")[0].equals(each)) {
+                List<String> taskKeys = regCenter.getChildrenKeys(RunningNode.getRunningJobNodePath(each));
+                if (0 == taskKeys.size()) {
+                    return false;
+                }
+                for (String eachTask : taskKeys) {
+                    if (taskId.contains(eachTask)) {
+                        taskExistFlag = true;
+                    }
+                }
+            }
+        }
+        return taskExistFlag;
+    }
+
     /**
      * 清理所有运行时状态.
      */

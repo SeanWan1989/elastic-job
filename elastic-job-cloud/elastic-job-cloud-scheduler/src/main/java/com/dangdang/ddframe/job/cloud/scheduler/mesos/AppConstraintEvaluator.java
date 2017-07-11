@@ -32,7 +32,6 @@ import com.sun.jersey.api.client.UniformInterfaceException;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.codehaus.jettison.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -77,7 +76,7 @@ public final class AppConstraintEvaluator implements ConstraintEvaluator {
             for (MesosStateService.ExecutorStateInfo each : facadeService.loadExecutorInfo()) {
                 runningApps.add(each.getId());
             }
-        } catch (final JSONException | UniformInterfaceException | ClientHandlerException e) {
+        } catch (final UniformInterfaceException | ClientHandlerException e) {
             clearAppRunningState();
         }
     }
@@ -93,6 +92,21 @@ public final class AppConstraintEvaluator implements ConstraintEvaluator {
     
     @Override
     public Result evaluate(final TaskRequest taskRequest, final VirtualMachineCurrentState targetVM, final TaskTrackerState taskTrackerState) {
+        try {
+            return process(taskRequest, targetVM);
+            //CHECKSTYLE:OFF
+        } catch (final Throwable th) {
+            //CHECKSTYLE:ON
+            log.error("Task {} App Constraint fail", taskRequest, th);
+        }
+        return new Result(true, "");
+    }
+    
+    private Result process(final TaskRequest taskRequest, final VirtualMachineCurrentState targetVM) {
+        if (targetVM.getAllCurrentOffers().isEmpty()) {
+            log.warn("{} Lack offer", taskRequest);
+            return new Result(true, "");
+        }
         double assigningCpus = 0.0d;
         double assigningMemoryMB = 0.0d;
         final String slaveId = targetVM.getAllCurrentOffers().iterator().next().getSlaveId().getValue();
@@ -101,12 +115,7 @@ public final class AppConstraintEvaluator implements ConstraintEvaluator {
                 return new Result(true, "");
             }
             Set<String> calculatedApps = new HashSet<>();
-            List<TaskRequest> taskRequests = new ArrayList<>(targetVM.getTasksCurrentlyAssigned().size() + 1);
-            taskRequests.add(taskRequest);
-            for (TaskAssignmentResult each : targetVM.getTasksCurrentlyAssigned()) {
-                taskRequests.add(each.getRequest());
-            }
-            for (TaskRequest each : taskRequests) {
+            for (TaskRequest each : getAllTaskRequest(taskRequest, targetVM)) {
                 assigningCpus += each.getCPUs();
                 assigningMemoryMB += each.getMemory();
                 if (isAppRunningOnSlave(each.getId(), slaveId)) {
@@ -124,11 +133,11 @@ public final class AppConstraintEvaluator implements ConstraintEvaluator {
             return new Result(true, "");
         }
         if (assigningCpus > targetVM.getCurrAvailableResources().cpuCores()) {
-            log.debug("Failure {} {} cpus:{}/{}", taskRequest.getId(), slaveId, assigningCpus, targetVM.getCurrAvailableResources().cpuCores());
+            log.warn("Failure {} {} cpus:{}/{}", taskRequest.getId(), slaveId, assigningCpus, targetVM.getCurrAvailableResources().cpuCores());
             return new Result(false, String.format("cpu:%s/%s", assigningCpus, targetVM.getCurrAvailableResources().cpuCores()));
         }
         if (assigningMemoryMB > targetVM.getCurrAvailableResources().memoryMB()) {
-            log.debug("Failure {} {} mem:{}/{}", taskRequest.getId(), slaveId, assigningMemoryMB, targetVM.getCurrAvailableResources().memoryMB());
+            log.warn("Failure {} {} mem:{}/{}", taskRequest.getId(), slaveId, assigningMemoryMB, targetVM.getCurrAvailableResources().memoryMB());
             return new Result(false, String.format("mem:%s/%s", assigningMemoryMB, targetVM.getCurrAvailableResources().memoryMB()));
         }
         log.debug("Success {} {} cpus:{}/{} mem:{}/{}", taskRequest.getId(), slaveId, assigningCpus, targetVM.getCurrAvailableResources()
@@ -141,6 +150,15 @@ public final class AppConstraintEvaluator implements ConstraintEvaluator {
         TaskContext taskContext = TaskContext.from(taskId);
         taskContext.setSlaveId(slaveId);
         return runningApps.contains(taskContext.getExecutorId(getJobConfiguration(taskContext).getAppName()));
+    }
+    
+    private List<TaskRequest> getAllTaskRequest(final TaskRequest taskRequest, final VirtualMachineCurrentState targetVM) {
+        List<TaskRequest> result = new ArrayList<>(targetVM.getTasksCurrentlyAssigned().size() + 1);
+        result.add(taskRequest);
+        for (TaskAssignmentResult each : targetVM.getTasksCurrentlyAssigned()) {
+            result.add(each.getRequest());
+        }
+        return result;
     }
     
     private CloudAppConfiguration getAppConfiguration(final String taskId) throws LackConfigException {
